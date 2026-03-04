@@ -7,7 +7,7 @@ setup(
     name="locallib",
     version="0.1.0",
     author="David",
-    description="Local analytics library with representative emission rate calculations",
+    description="Local analytics library with representative emission rate calculations, database utilities, and file operations",
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(),
@@ -27,6 +27,8 @@ setup(
         "pandas>=1.0.0",
         "numpy>=1.18.0",
         "gasanalytics",
+        "apps_dal_sql",
+        "python-dotenv",
     ],
     extras_require={
         "dev": [
