@@ -1,9 +1,12 @@
+from gasanalytics.sql import query_mssql
+
 class DBTable:
-    def __init__(self, name, columns = []):
+    def __init__(self, name, columns=None):
         self.name = name
-        self.columns = columns
+        # Ensure each instance gets its own columns list
+        self.columns = columns if columns is not None else []
         self.acronym = ''.join([char for char in name if char.isupper()])
-        for column in columns:
+        for column in self.columns:
             column.parent_table = self  # Set parent reference
             setattr(self, column.name, column)
 
@@ -15,7 +18,6 @@ class DBTable:
     
     def add_column(self, column):
         self.columns.append(column)
-        column.parent_table = self  # Set parent reference when adding
         setattr(self, column.name, column)
 
 class DBColumn:
@@ -23,6 +25,9 @@ class DBColumn:
         self.name = name
         self.type = type
         self.parent_table = parent_table
+        # If a parent_table is set, add this column to its columns list
+        if parent_table is not None:
+            parent_table.add_column(self)
 
     def get_column_name(self):
         return self.name
@@ -35,7 +40,7 @@ class DBColumn:
         return self.parent_table
     
     def __repr__(self):
-        return f'{self.parent_table.get_table_name()}.{self.name}'
+        return f'{self.parent_table.get_acronym()}.{self.name}'
 
 class DBConstructor:
     def __init__(self):
