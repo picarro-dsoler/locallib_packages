@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 # Removed PicarroDB import - functions are defined locally
 load_dotenv(override=True)
 
+
 class Query:
     def __init__(self, query):
         self.query = query
@@ -25,7 +26,7 @@ class Query:
         return self.child
     
     def execute(self,conn):
-        pointer = self.query
+        pointer = self
         df = None
         with conn.engine.connect() as connection:
             connection.execute(pointer)
