@@ -2,11 +2,11 @@
 locallib - Local library package
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.4"
 
 from .box import BoxFile, BoxFile_old
-from .analytics import BinnedRER, CustomBinnedRER, BinnedDistribution
-from .query import Query, get_emission_soruces, get_final_reports
+from .analytics import BinnedRER, CustomBinnedRER, BinnedDistribution, System_Matrix
+from .query import Query, get_emission_soruces_for_RER, get_final_reports
 from .picarrodb import (
     PConnection, 
     EUConnection, 
@@ -28,8 +28,9 @@ __all__ = [
     'BinnedRER', 
     'CustomBinnedRER', 
     'BinnedDistribution',
+    'System_Matrix',
     'Query',
-    'get_emission_soruces',
+    'get_emission_soruces_for_RER',
     'get_final_reports',
     'PConnection',
     'EUConnection',
