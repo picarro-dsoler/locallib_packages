@@ -2,6 +2,7 @@
 Box module for handling Box.com file operations
 """
 
-from .box import BoxFile, BoxFile_old
+from .BoxFile import BoxFile, BoxFile_old
+from .BoxFolder import BoxFolder
 
-__all__ = ['BoxFile', 'BoxFile_old']
+__all__ = ['BoxFile', 'BoxFile_old', 'BoxFolder']

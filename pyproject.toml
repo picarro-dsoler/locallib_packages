@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "locallib"
-version = "0.1.0"
-description = "Local analytics library with representative emission rate calculations"
+version = "0.1.4"
+description = "Local analytics library with representative emission rate calculations, system performance matrices, database utilities, and file operations"
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
@@ -23,6 +23,8 @@ dependencies = [
     "pandas>=1.0.0",
     "numpy>=1.18.0",
     "gasanalytics",
+    "apps_dal_sql",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]

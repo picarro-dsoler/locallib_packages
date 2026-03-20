@@ -5,9 +5,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallib",
-    version="0.1.0",
+    version="0.1.4",
     author="David",
-    description="Local analytics library with representative emission rate calculations, database utilities, and file operations",
+    description="Local analytics library with representative emission rate calculations, system performance matrices, database utilities, and file operations",
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(),

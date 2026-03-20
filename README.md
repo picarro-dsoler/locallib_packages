@@ -15,7 +15,7 @@ pip install -e .
 ### Analytics Classes
 
 ```python
-from locallib.analytics import BinnedRER, CustomBinnedRER, BinnedDistribution
+from locallib.analytics import BinnedRER, CustomBinnedRER, BinnedDistribution, System_Matrix
 
 # Using BinnedRER (predefined bins and labels)
 rer = BinnedRER()
@@ -37,6 +37,19 @@ bin_labels = ['Low', 'Medium', 'High', 'Very High']
 bin_floors = [0, 0.5, 1.0, 2.0, 10.0]
 binned_dist = BinnedDistribution(experiments, bin_labels, bin_floors)
 distribution = binned_dist.set_binned_distribution()
+
+# Using System_Matrix (for system performance analysis)
+system_matrix = System_Matrix(
+    prior_mu=-1.3,
+    prior_sigma=1.77,
+    trials=1000000,
+    error_mu=0,
+    error_sigma=0.95
+)
+# Get probability matrices
+prob_b_given_a = system_matrix.get_system_performance_b_given_a()
+prob_a_given_b = system_matrix.get_system_performance_a_given_b()
+counts = system_matrix.get_system_performance_counts()
 ```
 
 ### Box File Operations
@@ -137,6 +150,24 @@ A utility class for creating binned distributions from experimental data.
 **Methods:**
 - `set_binned_distribution()`: Create and return binned distribution DataFrame
 
+#### System_Matrix
+A class for generating system performance matrices using Monte Carlo simulations to analyze the relationship between actual and measured leak rates.
+
+**Parameters:**
+- `prior_mu`: Prior distribution mean for log-normal distribution (default: -1.3)
+- `prior_sigma`: Prior distribution sigma for log-normal distribution (default: 1.77)
+- `trials`: Number of Monte Carlo trials (default: 10000000)
+- `error_mu`: Error distribution mean (default: 0)
+- `error_sigma`: Error distribution sigma (default: 0.95)
+- `bin_floors`: List of bin boundaries (default: [1e-5, 0.1, 1, 2, 10, 1e5])
+- `b_labels`: Labels for measured leak bins (default: ["B-2", "B-1", "B-0.1", "B0.2", "B1"])
+- `a_labels`: Labels for actual leak bins (default: ["A-2", "A-1", "A-0.1", "A0.2", "A1"])
+
+**Methods:**
+- `get_system_performance_b_given_a()`: Returns probability matrix P(B|A) - probability of measured value B given actual value A
+- `get_system_performance_a_given_b()`: Returns probability matrix P(A|B) - probability of actual value A given measured value B  
+- `get_system_performance_counts()`: Returns raw count matrix from Monte Carlo simulation
+
 ### Box Module
 
 #### BoxFile
@@ -181,7 +212,7 @@ A class for managing database queries with parent-child relationships.
 - Generates SQL query to get final reports for a customer
 - `customer_name`: Name of the customer
 - `years`: Optional list of years to filter by
-- Returns formatted SQL query string
+- Returns formatted SQL query string with BoundaryName field
 
 ### PicarroDB Module
 

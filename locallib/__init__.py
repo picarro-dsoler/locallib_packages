@@ -4,7 +4,7 @@ locallib - Local library package
 
 __version__ = "0.1.4"
 
-from .box import BoxFile, BoxFile_old
+from .box import BoxFile, BoxFile_old, BoxFolder
 from .analytics import BinnedRER, CustomBinnedRER, BinnedDistribution, System_Matrix
 from .query import Query, get_emission_soruces_for_RER, get_final_reports
 from .picarrodb import (
@@ -25,6 +25,7 @@ from .picarrodb import (
 __all__ = [
     'BoxFile', 
     'BoxFile_old',
+    'BoxFolder',
     'BinnedRER', 
     'CustomBinnedRER', 
     'BinnedDistribution',

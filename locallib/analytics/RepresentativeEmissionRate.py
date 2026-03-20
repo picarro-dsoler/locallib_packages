@@ -97,7 +97,7 @@ class BinnedRER(CustomBinnedRER):
 
 
 class System_Matrix:
-    def __init__(self,prior_mu = -1.3, prior_sigma = 1.77, trials = 10000000, error_mu = 0, error_sigma = 0.95, bin_floors = [1e-5, 0.1,1,2,10,1e5], b_labels = ["B-2", "B-1","B-0.1","B0.2","B1"], a_labels = ["A-2", "A-1","A-0.1","A0.2","A1"]):
+    def __init__(self,prior_mu = -1.36, prior_sigma = 1.77, trials = 10000000, error_mu = 0, error_sigma = 0.95, bin_floors = [1e-5, 0.1,1,2,10,1e5], b_labels = ["B-2", "B-1","B-0.1","B0.2","B1"], a_labels = ["A-2", "A-1","A-0.1","A0.2","A1"]):
         self.prior_mu = prior_mu
         self.prior_sigma = prior_sigma
         self.trials = trials
