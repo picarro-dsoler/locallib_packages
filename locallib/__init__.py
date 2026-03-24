@@ -2,16 +2,15 @@
 locallib - Local library package
 """
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 from .box import BoxFile, BoxFile_old, BoxFolder
 from .analytics import BinnedRER, CustomBinnedRER, BinnedDistribution, System_Matrix
-from .query import Query, get_emission_soruces_for_RER, get_final_reports
+from .query import Query, get_emission_soruces_for_RER, get_final_reports, reports_view, survey_query, emission_sources_table_query_given_report_id
 from .picarrodb import (
     PConnection, 
     EUConnection, 
     DataHubConnection, 
-    PDataFrame, 
     EU1_Conn, 
     EU2_Conn, 
     DATAHUB_Conn, 
@@ -19,7 +18,8 @@ from .picarrodb import (
     DBColumn, 
     DBConstructor, 
     Condition, 
-    SQLQuery
+    SQLQuery,
+    DBAccessor
 )
 
 __all__ = [
@@ -33,10 +33,14 @@ __all__ = [
     'Query',
     'get_emission_soruces_for_RER',
     'get_final_reports',
+    'reports_view',
+    'survey_query',
+    'emission_sources_table_query_given_report_id',
+    'get_users',
+    'get_surveys',
     'PConnection',
     'EUConnection',
     'DataHubConnection',
-    'PDataFrame',
     'EU1_Conn',
     'EU2_Conn',
     'DATAHUB_Conn',
@@ -44,5 +48,6 @@ __all__ = [
     'DBColumn',
     'DBConstructor',
     'Condition',
-    'SQLQuery'
+    'SQLQuery',
+    'DBAccessor'
 ]

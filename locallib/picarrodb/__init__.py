@@ -6,18 +6,17 @@ from .PConnection import (
     PConnection, 
     EUConnection, 
     DataHubConnection, 
-    PDataFrame, 
     EU1_Conn, 
     EU2_Conn, 
     DATAHUB_Conn
 )
 from .PicarroDBClass import DBTable, DBColumn, DBConstructor, Condition, SQLQuery
+from .PConnection import DBAccessor
 
 __all__ = [
     'PConnection', 
     'EUConnection',
     'DataHubConnection',
-    'PDataFrame', 
     'EU1_Conn', 
     'EU2_Conn',
     'DATAHUB_Conn',
@@ -25,5 +24,6 @@ __all__ = [
     'DBColumn', 
     'DBConstructor',
     'Condition',
-    'SQLQuery'
+    'SQLQuery',
+    'DBAccessor'
 ]

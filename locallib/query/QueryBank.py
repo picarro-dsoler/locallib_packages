@@ -78,3 +78,236 @@ def get_emission_soruces_for_RER(report_table, table_name = None):
         AND (Es.Disposition = 1 OR Es.Disposition = 3)
     """
     return query
+
+
+def reports_view(customer_name, years, is_final_checkbox):
+    # Convert the list of years to a string for the SQL IN clause
+    years_str = ', '.join(map(str, years))
+    
+    # Start building the query
+    query = f"""
+    SELECT 
+        customer_shortname AS "CustomerName",
+        rp_id AS "ReportId",
+        rp_name AS "ReportName",
+        rp_title AS "ReportTitle",
+        rp_date AS "ReportDate",
+        rp_time AS "ReportTime",
+        rp_percentcoverageassets AS "ReportPercentCoverageAssets",
+        lisa_count AS "LisaCount",
+        rp_label_final AS "ReportLabelFinal",
+        rp_label_other AS "ReportLabelOther",
+        bo_mode AS "BoundaryMode",
+        bo_name AS "BoundaryName",
+        bo_type AS "BoundaryType",
+        bo_plant AS "BoundaryPlant",
+        bo_subplant AS "BoundarySubplant",
+        bo_region AS "BoundaryRegion",
+        bo_subregion AS "BoundarySubRegion",
+        bo_km_network AS "BoundaryKmNetwork"
+    FROM dash.v_report vr 
+    WHERE customer_shortname = '{customer_name}'
+    AND EXTRACT(YEAR FROM rp_date) IN ({years_str})
+    """
+    
+    # Conditionally add the rp_label_final filter
+    if is_final_checkbox:
+        query += "AND rp_label_final = 'Final Checkbox' "
+    
+    return query
+
+def survey_query(report_table=None):
+    query = f"""
+    SELECT
+        UPPER(C.Name) CustomerName,
+        CASE
+            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+        END AS ReportName,
+        R.Id AS ReportId,
+        S.Tag,
+        U.UserName,
+        A.SerialNumber AnalyzerSerialNumber,
+        S.StartDateTime AS StartDateTimeSurvey,
+        S.EndDateTime   AS EndDateTimeSurvey,
+        U.FirstName UserFirstName,
+        U.LastName UserLastName,
+        U.FirstName + ' ' + U.LastName AS Driver,
+        S.Id AS SurveyId,
+        S.StartDateTime,
+        S.EndDateTime,
+        S.StabilityClass,
+        S.Status,
+        S.BuildNumber,
+        S.AnalyzerId,
+        S.ReferenceGasBottleId,
+        SU.Description SurveyorUnit,
+        SMT.Description SurveyMode,
+        S.DrivingLengthMeters / 1000 AS DrivingLengthKM,
+        S.DrivingLengthMeters / 1000 * 0.621371 AS DrivingLengthMiles,
+        ROUND((SELECT SUM(DurationSeconds) FROM Segment WHERE SurveyId = S.Id AND Mode = 0), 0) DurationSeconds,
+        (SELECT SUM(DurationSeconds) / 60.0
+        FROM Segment
+        WHERE SurveyId = S.Id AND Mode = 0) AS DurationMinutes,
+    DATEDIFF(MINUTE, S.StartDateTime, S.EndDateTime) AS RawDurationMinutes,
+        S.StartEpoch,
+        S.EndEpoch,
+        L.Description AS Zone ,
+        TZ.Description AS TimeZone
+    FROM Customer C
+        INNER JOIN [User] U ON C.Id = U.CustomerId
+        INNER JOIN Survey S ON U.Id = S.UserId
+        INNER JOIN ReportDrivingSurvey RDS on S.Id = RDS.SurveyId
+        INNER JOIN Report R on RDS.ReportId = R.Id
+        INNER JOIN ReportType ON R.ReportTypeId = ReportType.Id
+        INNER JOIN Location L ON S.LocationId  = L.Id
+        INNER JOIN TimeZone TZ ON U.TimeZoneId = TZ.Id
+        LEFT JOIN Analyzer A ON S.AnalyzerId = A.Id
+        LEFT JOIN SurveyorUnit SU on S.SurveyorUnitId = SU.Id
+        LEFT JOIN SurveyModeType SMT on S.SurveyModeTypeId = SMT.Id
+    WHERE R.Id  IN (SELECT ReportId FROM {report_table})"""
+    return query
+
+def get_surveys(user_table, start_date = None, survey_table = None, end_date = None):
+    if survey_table is not None:
+        into_clause = f"INTO {survey_table}"
+    else:
+        into_clause = ""
+    if start_date is not None:
+        start_date_clause = f"AND s.StartDateTime >= '{start_date}'"
+    else:
+        start_date_clause = ""
+    query = f"""
+    SELECT 
+        s.Id as SurveyId,
+        s.UserId as UserId,
+        u.UserName as UserName,
+        su.Description as SurveyorUnit,
+        a.SerialNumber as AnalyzerSerialNumber,
+        s.Tag as SurveyTag,
+        S.StartDateTime AS StartDateTimeSurvey,
+        S.EndDateTime   AS EndDateTimeSurvey,
+        U.FirstName + ' ' + U.LastName AS Driver,
+        S.StartDateTime,
+        S.EndDateTime,
+        S.StabilityClass,
+        S.Status,
+        S.BuildNumber,
+        S.AnalyzerId,
+        S.ReferenceGasBottleId,
+        S.DrivingLengthMeters / 1000 AS DrivingLengthKM,
+        S.DrivingLengthMeters / 1000 * 0.621371 AS DrivingLengthMiles,
+        ROUND((SELECT SUM(DurationSeconds) FROM Segment WHERE SurveyId = S.Id AND Mode = 0), 0) DurationSeconds,
+        (SELECT SUM(DurationSeconds) / 60.0
+        FROM Segment
+        WHERE SurveyId = S.Id AND Mode = 0) AS DurationMinutes,
+    DATEDIFF(MINUTE, S.StartDateTime, S.EndDateTime) AS RawDurationMinutes
+    {into_clause} FROM Survey s
+    JOIN [User] u ON s.UserId = u.Id
+    INNER JOIN Analyzer a ON s.AnalyzerId = a.Id
+    LEFT JOIN SurveyorUnit su ON s.SurveyorUnitId = su.Id
+    WHERE UserId IN (SELECT UserId FROM {user_table})
+    {start_date_clause}
+    """
+    if end_date:
+        query += f"AND s.StartDateTime <= '{end_date}'"
+    return query
+
+def get_users(customer_name, user_table):
+    query = f"""
+    SELECT 
+    u.Id as UserId,
+    u.UserName as UserName
+    INTO {user_table}
+    FROM [User] u
+    JOIN Customer c ON c.id = u.CustomerId 
+    WHERE 
+    LOWER(c.Name) = LOWER('{customer_name}')
+    """
+    return query
+
+def emission_sources_table_query_given_report_id(report_table=None):
+    query = f"""
+    SELECT C.Name                                  AS CustomerName,
+        CASE
+            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+        END AS ReportName,
+        R.ReportTitle,
+        R.DateStarted AS ReportDate,
+        UPPER(CONVERT(NVARCHAR(50), ES.Id))     AS EmissionSourceId,
+        ES.Lisa.STAsText()                  AS LisaWkt4326,
+        ES.PeakNumber AS LisaNumber,
+        CASE
+            WHEN ES.UniqueIdentifier IS NOT NULL THEN ES.UniqueIdentifier
+            ELSE
+                CONCAT(
+                    'CR-',
+                    SUBSTRING(CONVERT(nvarchar(50), ES.ReportId), 1, 6),
+                    CASE
+                        WHEN ES.PeakNumber >= 0 THEN '-L-'
+                        ELSE '-LF-'
+                    END,
+                    ABS(ES.PeakNumber)
+                )
+        END AS UniqueIdentifier,
+        R.BuildNumber AS ReportBuildNumber,
+        RAC.AssetLengthKM AS ReportAssetLengthKm,
+        RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
+        RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
+        ES.CH4,
+        ES.ClassificationConfidence,
+        ES.Disposition,
+        ES.DetectionProbability,
+        ES.EmissionRate,
+        ES.EmissionRateAMean,
+        ES.EmissionRateAStd,
+        ES.EmissionRateGMean,
+        ES.EmissionRateGStd,
+        ES.EmissionRateLowerBound,
+        ES.EmissionRateUpperBound,
+        ES.EthaneRatio,
+        ES.EthaneRatioUncertainty,
+        ES.GeocodeAddress,
+        ES.GpsLatitude,
+        ES.GpsLongitude,
+        ES.IsFiltered,
+        ES.MaxAmplitude,
+        ES.MaxCarSpeed,
+        ES.MaxWindSpeed,
+        ES.MinWindSpeed,
+        ES.NumberOfPasses,
+        ES.NumberOfPeaks,
+        ES.PeakNumber,
+        ES.PriorityScore,
+        ES.RankingGroup,
+        ES.ReportId,
+        ES.RepresentativePeakId,
+        ES.RepresentativeEmissionRate,
+        ES.RepresentativeBinLabel,
+        P.EpochTime AS RepresentativePeakEpochTime,
+        STUFF((SELECT DISTINCT ' | ' + L.Title
+               FROM ReportLabel RL
+               INNER JOIN Label L ON RL.LabelId = L.Id
+               WHERE RL.ReportId = R.Id AND RL.IsActive = 1
+               FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS Labels,
+        (SELECT COUNT(DISTINCT L.Title)
+         FROM ReportLabel RL
+         INNER JOIN Label L ON RL.LabelId = L.Id
+         WHERE RL.ReportId = R.Id AND RL.IsActive = 1) AS NumberOfLabels,
+        TZ.Description AS CommonTimeZone
+    FROM Customer C
+        JOIN Report R ON C.Id = R.CustomerID
+        JOIN EmissionSource ES ON R.Id = ES.ReportId
+        LEFT JOIN Peak P ON ES.RepresentativePeakId = P.Id
+        LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
+        LEFT JOIN ReportStatusType RST ON R.ReportStatusTypeId = RST.Id
+        LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
+        INNER JOIN ReportType ON R.ReportTypeId = ReportType.Id
+        INNER JOIN TimeZone TZ ON R.TimeZoneId = TZ.Id
+    WHERE R.Id IN (SELECT ReportId FROM {report_table})
+      AND (ES.Disposition = 1 OR ES.Disposition = 3)
+    """
+    return query
