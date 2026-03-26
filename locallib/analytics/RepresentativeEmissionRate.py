@@ -95,9 +95,8 @@ class BinnedRER(CustomBinnedRER):
         self.system_PBA.index = A[::-1]
         super().__init__(A,B,bin_floors)
 
-
 class System_Matrix:
-    def __init__(self,prior_mu = -1.36, prior_sigma = 1.77, trials = 10000000, error_mu = 0, error_sigma = 0.95, bin_floors = [1e-5, 0.1,1,2,10,1e5], b_labels = ["B-2", "B-1","B-0.1","B0.2","B1"], a_labels = ["A-2", "A-1","A-0.1","A0.2","A1"]):
+    def __init__(self,prior_mu = -1.36, prior_sigma = 1.77, trials = 1000000, error_mu = 0, error_sigma = 0.95, bin_floors = [1e-5, 0.1,1,10,1e5], b_labels = ["B-2", "B-1","B0","B1"], a_labels = ["A-2", "A-1","A0","A1"]):
         self.prior_mu = prior_mu
         self.prior_sigma = prior_sigma
         self.trials = trials
@@ -106,7 +105,11 @@ class System_Matrix:
         self.bin_floors = bin_floors
         self.b_labels = b_labels
         self.a_labels = a_labels
-        # Perform Monte Carlo to get the relationship between A and B given an error
+
+        self._system_performance_counts()
+
+    def _system_performance_counts(self):
+            # Perform Monte Carlo to get the relationship between A and B given an error
         # of np.random.lognormal(0.0,0.95)
         self.experiments = np.random.lognormal(self.prior_mu, self.prior_sigma, self.trials)
         self.random_errors = np.random.lognormal(mean=self.error_mu, sigma=self.error_sigma, size=self.trials)
@@ -120,6 +123,7 @@ class System_Matrix:
         # System performance for A given B and the inverse (Tables 1 and 3)
         # Convert to probability of B given A by normalizing rows to sum to 1
         self.system_performance_counts = pd.crosstab(df["A"], df["B"])
+        return self.system_performance_counts
 
     def get_PBA_matrix(self):
         return self.system_performance_counts.div(self.system_performance_counts.sum(axis=1), axis=0)
@@ -128,4 +132,25 @@ class System_Matrix:
         return self.system_performance_counts.div(self.system_performance_counts.sum(axis=0), axis=1)
     
     def get_counts_matrix(self):
+        return self.system_performance_counts
+
+class SymmetricSystem_Matrix(System_Matrix):
+    def __init__(self,prior_mu = -1.36, prior_sigma = 1.77, trials = 10000000, error_mu = 0, error_sigma = 0.95, bin_floors = [1e-5, 0.1,1,10,1e5], b_labels = ["B-2", "B-1","B0","B1"], a_labels = ["A-2", "A-1","A0","A1"]):
+        super().__init__(prior_mu, prior_sigma, trials, error_mu, error_sigma, bin_floors, b_labels, a_labels)
+
+
+    def _system_performance_counts(self):
+        LOG_START = -2
+        LOG_STOP = 3
+        np.random.seed(42)
+        #Actual leak rate distribution
+        A = np.logspace(LOG_START, LOG_STOP, num=100_000)
+        #Measured leak rate distribution
+        B = A * np.random.lognormal(self.error_mu, self.error_sigma, size=len(A))
+
+        df = pd.DataFrame({'A_val': A, 'B_val': B})
+        df['A'] = pd.cut(df['A_val'], bins=self.bin_floors, labels=self.a_labels)
+        df['B'] = pd.cut(df['B_val'], bins=self.bin_floors, labels=self.b_labels)
+        df.dropna(subset=['A', 'B'], inplace=True)
+        self.system_performance_counts = pd.crosstab(df['A'], df['B'])
         return self.system_performance_counts

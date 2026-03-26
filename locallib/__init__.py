@@ -5,7 +5,7 @@ locallib - Local library package
 __version__ = "0.1.5"
 
 from .box import BoxFile, BoxFile_old, BoxFolder
-from .analytics import BinnedRER, CustomBinnedRER, BinnedDistribution, System_Matrix
+from .analytics import BinnedRER, CustomBinnedRER, BinnedDistribution, System_Matrix, SymmetricSystem_Matrix
 from .query import Query, get_emission_soruces_for_RER, get_final_reports, reports_view, survey_query, emission_sources_table_query_given_report_id
 from .picarrodb import (
     PConnection, 
@@ -21,6 +21,7 @@ from .picarrodb import (
     SQLQuery,
     DBAccessor
 )
+from .slack import SlackWriter
 
 __all__ = [
     'BoxFile', 
@@ -30,6 +31,7 @@ __all__ = [
     'CustomBinnedRER', 
     'BinnedDistribution',
     'System_Matrix',
+    'SymmetricSystem_Matrix',
     'Query',
     'get_emission_soruces_for_RER',
     'get_final_reports',
@@ -49,5 +51,6 @@ __all__ = [
     'DBConstructor',
     'Condition',
     'SQLQuery',
-    'DBAccessor'
+    'DBAccessor',
+    'SlackWriter'
 ]

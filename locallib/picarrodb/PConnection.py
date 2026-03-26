@@ -13,11 +13,12 @@ load_dotenv(override=True)
 
 
 class PConnection:
-    def __init__(self, host: str, database: str, user: str, password: str):
+    def __init__(self, host: str, database: str, user: str, password: str, dbtype: str = ''):
         self.host = host
         self.database = database
         self.user = user
         self.password = password
+        self.dbtype = dbtype
         self.engine = self.set_engine()
         if self.engine is not None:
             self.session = Session(bind=self.engine, future=True)
@@ -33,7 +34,7 @@ class PConnection:
     
 class EUConnection(PConnection):
     def __init__(self, host: str, database: str, user: str, password: str):
-        super().__init__(host, database, user, password)
+        super().__init__(host, database, user, password, dbtype = 'mssql')
             
     def set_engine(self):
         return create_engine(
@@ -42,7 +43,7 @@ class EUConnection(PConnection):
     
 class DataHubConnection(PConnection):
     def __init__(self, host: str, database: str, user: str, password: str):
-        super().__init__(host, database, user, password)
+        super().__init__(host, database, user, password, dbtype = 'postgresql')
             
     def set_engine(self):
         return create_engine(
