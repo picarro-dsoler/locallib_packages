@@ -208,7 +208,13 @@ class DBAccessor:
                 cur.execute(f"SELECT COUNT(*) FROM tempdb.sys.tables WHERE name = '{temp_table_name.replace('#', '')}'")
                 table_exists = cur.fetchone()[0] > 0
                 if erase_table:
-                    cur.execute(f"DROP TABLE IF EXISTS {temp_table_name};")
+                    # DROP TABLE IF EXISTS needs SQL Server 2016+ / compat 130+.
+                    # US/legacy servers often fail with "Incorrect syntax near 'IF'"; use OBJECT_ID instead.
+                    t_esc = temp_table_name.replace("'", "''")
+                    cur.execute(
+                        f"IF OBJECT_ID(N'tempdb..{t_esc}', N'U') IS NOT NULL "
+                        f"DROP TABLE {temp_table_name};"
+                    )
                     cur.execute(create_sql)
                 else:
                     cur.execute(create_sql)
