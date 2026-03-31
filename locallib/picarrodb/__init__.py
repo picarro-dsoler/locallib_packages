@@ -8,18 +8,20 @@ from .PConnection import (
     DataHubConnection, 
     EU1_Conn, 
     EU2_Conn, 
-    DATAHUB_Conn
+    DATAHUB_Conn,
+    US_Conn
 )
 from .PicarroDBClass import DBTable, DBColumn, DBConstructor, Condition, SQLQuery
 from .PConnection import DBAccessor
 
-__all__ = [
+__all__ = [ 
     'PConnection', 
     'EUConnection',
     'DataHubConnection',
     'EU1_Conn', 
     'EU2_Conn',
     'DATAHUB_Conn',
+    'US_Conn',
     'DBTable',
     'DBColumn', 
     'DBConstructor',

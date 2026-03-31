@@ -393,11 +393,11 @@ except Exception as e:
     DATAHUB_Conn = None
 
 try:
-    US_Conn = EUConnection(host="30.30.240.1", user=US_USER, password=US_PASSWORD, database="SurveyorProduction")
-    print("EU1_Conn created successfully")
+    US_Conn = EUConnection(host="30.30.240.170", user=US_USER, password=US_PASSWORD, database="SurveyorProduction")
+    print("US_Conn created successfully")
 except Exception as e:
-    print(f"Error creating EU1_Conn: {e}")
-    EU1_DB = None
+    print(f"Error creating US_Conn: {e}")
+    US_Conn = None
 
 
 
