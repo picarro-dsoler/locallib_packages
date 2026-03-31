@@ -10,8 +10,11 @@ load_dotenv(override=True)
 
 
 class Query:
-    def __init__(self, query):
-        self.query = query
+    def __init__(self, query = None):
+        if query is not None:
+            self.query = query
+        else:
+            raise ValueError("Query is required")
         self.parent = None
         self.child = None
     def set_parent(self, parent):
@@ -19,13 +22,27 @@ class Query:
     def set_child(self, child):
         self.child = child
     def execute(self,conn):
+        df = None
+        if isinstance(conn, list):
+            for conn in conn:
+                df_temp = self.execute_sql(conn)
+                if df is None:
+                    df = df_temp
+                else:
+                    df = pd.concat([df, df_temp])
+            return df
+        else:
+            return self.execute_sql(conn)
+
+
+    def execute_sql(self,conn):
         pointer = self
         df = None
         with conn.engine.connect() as connection:
             while pointer.child is not None:
                 connection.execute(pointer.query)
                 pointer = pointer.child
-            df = pd.read_sql(sql=pointer.query, con=connection)
+            df = pd.read_sql(sql=pointer.query, con=connection)                
         return df
 
 
