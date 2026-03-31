@@ -1,15 +1,18 @@
-import logging
 import os
-import time
+import warnings
 import pandas as pd
 from dotenv import load_dotenv
-from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from typing import Tuple
 import uuid
 import numpy as np
 load_dotenv(override=True)
+
+# Suppress pandas warnings about DBAPI connections
+warnings.filterwarnings("ignore", 
+                       message=".*pandas only supports SQLAlchemy connectable.*",
+                       category=UserWarning)
 
 
 class PConnection:
@@ -94,15 +97,21 @@ class DBAccessor:
             temp_name, temp_conn = self.upload_single_column_to_temp_postgresql(self._obj,Conn=Conn, source_col=source_col, temp_table_name=temp_table_name, sql_col_name=sql_col_name, varchar_len=varchar_len, chunksize=chunksize, erase_table=erase_table)
         else:
             raise ValueError(f"Unsupported database type: {Conn.dbtype}")
-        if isinstance(self.query, list):
-            df = None
-            for query in self.query:
-                if df is None:
-                    df = pd.read_sql(query, temp_conn)
-                else:
-                    df = pd.merge(df, pd.read_sql(query, temp_conn), on=source_col, how='left')
-        else:
-            df = pd.read_sql(self.query, temp_conn)
+        
+        # Suppress pandas UserWarning about DBAPI connections while keeping temp_conn alive
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", 
+                                  message=".*pandas only supports SQLAlchemy connectable.*",
+                                  category=UserWarning)
+            if isinstance(self.query, list):
+                df = None
+                for query in self.query:
+                    if df is None:
+                        df = pd.read_sql(query, temp_conn)
+                    else:
+                        df = pd.merge(df, pd.read_sql(query, temp_conn), on=source_col, how='left')
+            else:
+                df = pd.read_sql(self.query, temp_conn)
 
         if 'id' in source_col.lower() or 'Id' in source_col:
             df[source_col] = df[source_col].astype(str).str.upper()
