@@ -1,5 +1,3 @@
-from gasanalytics.sql import query_mssql
-
 class DBTable:
     def __init__(self, name, columns=None):
         self.name = name
@@ -15,32 +13,35 @@ class DBTable:
 
     def get_acronym(self):
         return self.acronym
+
+    def get_columns(self, format = 'query'):
+        if format == 'query':
+            query = [f'{self.acronym}.{column.get_column_name()}.STAsText()' if column.datatype == 'geometry' else f'{self.acronym}.{column.get_column_name()}' for column in self.columns]
+            query = ' , '.join(query)
+            return query
+        elif format == 'list':
+            list = [f'{column.get_column_name()}' for column in self.columns]
+            return list
+        else:
+            raise ValueError(f'Invalid format: {format}')
     
     def add_column(self, column):
         self.columns.append(column)
         setattr(self, column.name, column)
 
+    def __repr__(self):
+        return f'{self.name}'
+
 class DBColumn:
-    def __init__(self, name, parent_table=None):
+    def __init__(self, name, datatype = None):
         self.name = name
-        self.type = type
-        self.parent_table = parent_table
-        # If a parent_table is set, add this column to its columns list
-        if parent_table is not None:
-            parent_table.add_column(self)
+        self.datatype = datatype
 
     def get_column_name(self):
         return self.name
-
-    def get_full_column_name(self):
-        return f'{self.parent_table.get_acronym()}.{self.get_column_name()}'
-    
-    def get_parent_table(self):
-        """Get reference to the parent table"""
-        return self.parent_table
     
     def __repr__(self):
-        return f'{self.parent_table.get_acronym()}.{self.name}'
+        return f'{self.name}'
 
 class DBConstructor:
     def __init__(self):

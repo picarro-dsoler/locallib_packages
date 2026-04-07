@@ -2,8 +2,6 @@ import pandas as pd
 from datetime import datetime
 import pytz
 
-SCFH_TO_G_PER_HOUR = 19.1
-SCFH_TO_SLPM_FACTOR = 0.471947
 COMMON_TIMEZONE_MAPPINGS = {
     'Pacific Standard Time': 'America/Los_Angeles',
     'Mountain Standard Time': 'America/Denver',

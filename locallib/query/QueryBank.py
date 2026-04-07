@@ -17,11 +17,23 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
     query = f"""
     SELECT 
         C.Name AS CustomerName,
+        CASE
+            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+        END AS ReportName,
         R.Id AS ReportId,
         R.ReportTitle AS ReportTitle,
         L.Title AS Label,
         R.DateStarted AS ReportDate,
-        RA.ExternalId AS BoundaryName
+        RA.ExternalId AS BoundaryName,
+        RAC.AssetLengthKM AS ReportAssetLengthKm,
+        RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
+        RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
+        RAC.DistributionPipeCoveredKm,
+        RAC.DistributionPipePercentCovered,
+        RAC.ServicePipeKm,
+        RAC.ServicePipeCoveredKm
     {into_clause}
     FROM
         Report R
@@ -34,6 +46,8 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
     LEFT JOIN ReportType ON
         R.ReportTypeId = ReportType.Id
     LEFT JOIN ReportArea RA ON R.Id = RA.ReportId
+    LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
+    LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
     WHERE
         LOWER(C.Name) = LOWER('{customer_name}')
         AND L.Title = 'Final Checkbox'
@@ -56,6 +70,11 @@ def get_final_reports(customer_name, table_name = None, years=None):
     query = f"""
     SELECT 
         C.Name AS CustomerName,
+        CASE
+            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+        END AS ReportName,
         R.Id AS ReportId,
         R.ReportTitle AS ReportTitle,
         L.Title AS Label,
@@ -273,16 +292,8 @@ def get_users(customer_name, user_table):
 
 def emission_sources_table_query_given_report_id(report_table=None):
     query = f"""
-    SELECT C.Name                                  AS CustomerName,
-        CASE
-            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
-            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
-            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
-        END AS ReportName,
-        R.ReportTitle,
-        R.DateStarted AS ReportDate,
+    SELECT
         UPPER(CONVERT(NVARCHAR(50), ES.Id))     AS EmissionSourceId,
-        ES.Lisa.STAsText()                  AS LisaWkt4326,
         ES.PeakNumber AS LisaNumber,
         CASE
             WHEN ES.UniqueIdentifier IS NOT NULL THEN ES.UniqueIdentifier
@@ -297,12 +308,10 @@ def emission_sources_table_query_given_report_id(report_table=None):
                     ABS(ES.PeakNumber)
                 )
         END AS UniqueIdentifier,
-        R.BuildNumber AS ReportBuildNumber,
-        RAC.AssetLengthKM AS ReportAssetLengthKm,
-        RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
-        RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
         ES.CH4,
         ES.ClassificationConfidence,
+        ES.RepresentativePeakId,
+        ES.PriorityScore2,
         ES.Disposition,
         ES.DetectionProbability,
         ES.EmissionRate,
@@ -315,21 +324,28 @@ def emission_sources_table_query_given_report_id(report_table=None):
         ES.EthaneRatio,
         ES.EthaneRatioUncertainty,
         ES.GeocodeAddress,
-        ES.GpsLatitude,
-        ES.GpsLongitude,
+        ES.GpsLatitude AS LisaLatitude,
+        ES.GpsLongitude AS LisaLongitude,
+        ES.Lisa.STAsText() AS LisaGeometry,
         ES.IsFiltered,
         ES.MaxAmplitude,
         ES.MaxCarSpeed,
+        ROUND(CAST(ES.NumberOfPeaks AS FLOAT) / NULLIF(CAST(ES.NumberOfPasses AS FLOAT), 0), 2) AS Persistence,
         ES.MaxWindSpeed,
         ES.MinWindSpeed,
         ES.NumberOfPasses,
         ES.NumberOfPeaks,
         ES.PeakNumber,
         ES.PriorityScore,
-        ES.RankingGroup,
+        ES.RankingGroup AS RiskRankingBin,
+        (SELECT SurveyId FROM Peak WHERE Id = ES.RepresentativePeakId) AS SurveyId,
         ES.ReportId,
-        ES.RepresentativePeakId,
+        ES.EmissionRate,
+        ES.EmissionRate * 0.471947 AS "EmissionRate(lpm)",
+        ES.EmissionRate * 19.1 AS "EmissionRate(g/h)",
         ES.RepresentativeEmissionRate,
+        ES.RepresentativeEmissionRate * 0.471947 AS "RepresentativeEmissionRate(lpm)",
+        ES.RepresentativeEmissionRate * 19.1 AS "RepresentativeEmissionRate(g/h)",
         ES.RepresentativeBinLabel,
         P.EpochTime AS RepresentativePeakEpochTime,
         STUFF((SELECT DISTINCT ' | ' + L.Title

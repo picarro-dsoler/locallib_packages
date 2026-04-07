@@ -12,7 +12,8 @@ from .PConnection import (
     US_Conn
 )
 from .PicarroDBClass import DBTable, DBColumn, DBConstructor, Condition, SQLQuery
-from .PConnection import DBAccessor
+from . import ProdDB  # Import the entire ProdDB module containing all table definitions
+from .ProdDB import *  # Import all table definitions directly for easy access
 
 __all__ = [ 
     'PConnection', 
@@ -27,5 +28,5 @@ __all__ = [
     'DBConstructor',
     'Condition',
     'SQLQuery',
-    'DBAccessor'
-]
+    'ProdDB'  # Production database table definitions module
+] + ProdDB.__all__  # Add all table definitions to the exports
