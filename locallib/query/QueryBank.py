@@ -340,7 +340,6 @@ def emission_sources_table_query_given_report_id(report_table=None):
         ES.RankingGroup AS RiskRankingBin,
         (SELECT SurveyId FROM Peak WHERE Id = ES.RepresentativePeakId) AS SurveyId,
         ES.ReportId,
-        ES.EmissionRate,
         ES.EmissionRate * 0.471947 AS "EmissionRate(lpm)",
         ES.EmissionRate * 19.1 AS "EmissionRate(g/h)",
         ES.RepresentativeEmissionRate,
