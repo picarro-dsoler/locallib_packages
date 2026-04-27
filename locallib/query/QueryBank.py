@@ -57,6 +57,14 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
     return query
 
 def get_final_reports(customer_name, table_name = None, years=None):
+    if isinstance(customer_name, list):
+        customer_name_clauses = []
+        for name in customer_name:
+            customer_name_clauses.append(f"LOWER(C.Name) = LOWER('{name}')")
+        customer_name_filter = " OR ".join(customer_name_clauses)
+        customer_name_filter = f"({customer_name_filter})"
+    else:
+        customer_name_filter = f"LOWER(C.Name) = LOWER('{customer_name}')"
     year_filter = ""
     if years:
         years_str = ", ".join(str(year) for year in years)
@@ -79,7 +87,14 @@ def get_final_reports(customer_name, table_name = None, years=None):
         R.ReportTitle AS ReportTitle,
         L.Title AS Label,
         R.DateStarted AS ReportDate,
-        RA.ExternalId AS BoundaryName
+        RA.ExternalId AS BoundaryName,
+        RAC.AssetLengthKM AS ReportAssetLengthKm,
+        RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
+        RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
+        RAC.DistributionPipeCoveredKm,
+        RAC.DistributionPipePercentCovered,
+        RAC.ServicePipeKm,
+        RAC.ServicePipeCoveredKm
     {into_clause}
     FROM
         Report R
@@ -92,8 +107,10 @@ def get_final_reports(customer_name, table_name = None, years=None):
     LEFT JOIN ReportType ON
         R.ReportTypeId = ReportType.Id
     LEFT JOIN ReportArea RA ON R.Id = RA.ReportId
+    LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
+    LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
     WHERE
-        LOWER(C.Name) = LOWER('{customer_name}')
+        {customer_name_filter}
         AND L.Title = 'Final Checkbox'
         AND RL.IsActive = 1
         {year_filter}

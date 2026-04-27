@@ -85,7 +85,7 @@ except Exception as e:
     EU2_Conn = None
 
 try:
-    DATAHUB_Conn = DataHubConnection(host="datahub.picarro.sensebird.net", user=DATAHUB_USER, password=DATAHUB_PASSWORD, database=DATAHUB_DATABASE)
+    DATAHUB_Conn = DataHubConnection(host="eu-sensebird-migrated-rds-pg1-r4-prd.czz1yneu9gmr.eu-central-1.rds.amazonaws.com", user=DATAHUB_USER, password=DATAHUB_PASSWORD, database=DATAHUB_DATABASE)
     print("DataHub_Conn created successfully")
 except Exception as e:
     print(f"Error creating DATAHUB_Conn: {e}")
