@@ -16,7 +16,7 @@ class DBTable:
 
     def get_columns(self, format = 'query'):
         if format == 'query':
-            query = [f'{self.acronym}.{column.get_column_name()}.STAsText()' if column.datatype == 'geometry' else f'{self.acronym}.{column.get_column_name()}' for column in self.columns]
+            query = [f'{self.acronym}.{column.get_column_name()}.STAsText() as {column.get_column_name()}' if column.datatype == 'geometry' else f'{self.acronym}.{column.get_column_name()}' for column in self.columns]
             query = ' , '.join(query)
             return query
         elif format == 'list':
