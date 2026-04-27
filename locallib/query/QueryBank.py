@@ -1,3 +1,12 @@
+from locallib.query.Query import Query
+
+def setup_query(query_func):
+    def wrapper(*args, **kwargs):
+        query = query_func(*args, **kwargs)
+        return Query(query = query)
+    return wrapper
+
+@setup_query
 def get_reports(customer_name, table_name = None, years=None, final_checkbox = True):
     year_filter = ""
     if years:
@@ -117,6 +126,7 @@ def get_final_reports(customer_name, table_name = None, years=None):
     """
     return query
 
+@setup_query
 def get_emission_soruces_for_RER(report_table, table_name = None):
     if table_name is not None:
         into_clause = f"INTO {table_name}"
