@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from typing import Tuple
 import uuid
 import numpy as np
+
+from locallib.query import Query
+
 # Register as pandas accessor
 @pd.api.extensions.register_dataframe_accessor("db")
 class DBAccessor:
@@ -22,7 +25,10 @@ class DBAccessor:
         return self._obj
     
     def set_query(self, query):
-        self.query = query
+        if isinstance(query, Query):
+            self.query = query.query
+        else:
+            self.query = query
         return self._obj
 
     def execute(self, Conn, source_col: str, temp_table_name: str = "#tmp_single_col", sql_col_name:  None = None, varchar_len: int = 4000, chunksize: int = 10000, erase_table: bool = True, append: bool = False, fillna: bool = False):

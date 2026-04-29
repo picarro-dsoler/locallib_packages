@@ -32,6 +32,15 @@ class DBTable:
     def __repr__(self):
         return f'{self.name}'
 
+    def delete_column(self, column_name):
+        for col in self.columns:    
+            if col.name == column_name:
+                self.columns.remove(col)
+                delattr(self, col.name)
+                break
+        else:
+            raise ValueError(f'Column {column_name} not found in table {self.name}')
+
 class DBColumn:
     def __init__(self, name, datatype = None):
         self.name = name
