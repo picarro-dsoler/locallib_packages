@@ -1,27 +1,23 @@
 """
 query - Database query utilities with nested query support
 """
+import inspect
+import importlib
+import pkgutil
 
 from .Query import Query
-from .QueryBank import (
-    get_reports,
-    get_final_reports, 
-    get_emission_soruces_for_RER, 
-    reports_view, 
-    survey_query, 
-    emission_sources_table_query_given_report_id, 
-    get_users, 
-    get_surveys
-)
+from .QueryBank import *
 
 __all__ = [
-    'Query', 
-    'get_reports',
-    'get_emission_soruces_for_RER', 
-    'get_final_reports',
-    'reports_view',
-    'survey_query',
-    'emission_sources_table_query_given_report_id',
-    'get_users',
-    'get_surveys'
+    'Query'
 ]
+
+for module_info in pkgutil.iter_modules(__path__):
+    module = importlib.import_module(f"{__name__}.{module_info.name}")
+    for name, obj in inspect.getmembers(module, inspect.isfunction):
+        if obj.__module__ == module.__name__:
+            globals()[name] = obj
+            __all__.append(name)
+
+
+
