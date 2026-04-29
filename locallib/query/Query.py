@@ -19,8 +19,37 @@ class Query:
         self.child = None
     def set_parent(self, parent):
         self.parent = parent
+    def _fix_tmp_table_name(self):
+        """
+        Checks for an INTO clause in the query and ensures that any temporary table with a 'tmp_' prefix
+        has a '#' before its table name. Returns the name of the table if found and changed, else None.
+        """
+        import re
+
+        table_name_modified = None
+
+        def fix_into(match):
+            nonlocal table_name_modified
+            into_prefix = match.group(1)
+            table_name = match.group(2)
+            after_name = match.group(3) if match.group(3) else ""
+            # Only add # if 'tmp_' is at the start and not already prefixed with #
+            if table_name.startswith("tmp_") and not table_name.startswith("#tmp_"):
+                table_name_modified = f"#{table_name}"
+                return f"{into_prefix}#{table_name}{after_name}"
+            else:
+                return match.group(0)
+
+        self.query = re.sub(
+            r"(\bINTO\s+)([A-Za-z_][A-Za-z0-9_]*)(\b|\s|$)",
+            fix_into,
+            self.query,
+            flags=re.IGNORECASE
+        )
+        return table_name_modified
     def set_child(self, child):
         self.child = child
+        
     def execute(self,conn):
         df = None
         if isinstance(conn, list):

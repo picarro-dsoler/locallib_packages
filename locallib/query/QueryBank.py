@@ -42,7 +42,10 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         RAC.DistributionPipeCoveredKm,
         RAC.DistributionPipePercentCovered,
         RAC.ServicePipeKm,
-        RAC.ServicePipeCoveredKm
+        RAC.ServicePipeCoveredKm,
+        YEAR(R.DateStarted) AS ReportYear,
+        MONTH(R.DateStarted) AS ReportMonth
+   
     {into_clause}
     FROM
         Report R
@@ -167,6 +170,26 @@ def get_emission_soruces_for_RER(report_table, table_name = None):
         AND ES.EmissionRate > 0 
         AND (Es.Disposition = 1 OR Es.Disposition = 3)
     """
+    return query
+
+def query_reports_view(report_table):
+    query =  f"""select 
+    customer_shortname  as "CustomerShortName",
+    rp_id  as "ReportId",
+    rp_percentcoverageassets as "ReportPercentCoverageAssets_DH",
+    lisa_count as "LisaCount",
+    rp_label_final as "ReportLabelFinal",
+    rp_label_other as "ReportLabelOther",
+    bo_name as "BoundaryName",
+    bo_mode as "BoundaryMode",
+    bo_type as "BoundaryType",
+    bo_plant as "BoundaryPlant",
+    bo_subplant as "BoundarySubplant",
+    bo_region as "BoundaryRegion",
+    bo_subregion as "BoundarySubRegion",
+    bo_km_network as "BoundaryKmNetwork"
+    from dash.v_report 
+    where rp_id IN (SELECT LOWER(ReportId::text)::uuid FROM {report_table})"""
     return query
 
 
@@ -396,4 +419,41 @@ def emission_sources_table_query_given_report_id(report_table=None):
     WHERE R.Id IN (SELECT ReportId FROM {report_table})
       AND (ES.Disposition = 1 OR ES.Disposition = 3)
     """
+    return query
+
+@setup_query
+def query_box_table(report_table = None, table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query = f"""SELECT B.Id as BoxId,
+                B.BoxShape.STAsText() as BoxShape,
+                (SELECT BT.Name FROM BoxTypes BT WHERE BT.Id = B.BoxTypeId) AS BoxType,
+                B.ReportId, B.UniqueIdentifier
+                {into_clause}
+                FROM Box B 
+                
+                WHERE B.ReportId IN (SELECT ReportId FROM {report_table})
+                """
+    return query
+
+@setup_query
+def query_report_investigation(box_table = None, table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query = f"""SELECT RI.* , 
+    (
+        SELECT ITT.Name 
+        FROM InvestigationTemplateType ITT 
+        WHERE ITT.Id = (
+            SELECT IT.InvestigationTemplateTypeId 
+            FROM InvestigationTemplate IT 
+            WHERE IT.Id = RI.InvestigationTemplateId
+        )
+    ) AS InvestigationTemplateType
+    FROM ReportInvestigation RI 
+    WHERE RI.BoxId IN (SELECT BoxId FROM {box_table})"""
     return query
