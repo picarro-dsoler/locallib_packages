@@ -1,4 +1,5 @@
 from locallib.query.Query import Query
+from locallib.picarrodb import *
 
 def setup_query(query_func):
     def wrapper(*args, **kwargs):
@@ -36,6 +37,7 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         L.Title AS Label,
         R.DateStarted AS ReportDate,
         RA.ExternalId AS BoundaryName,
+        RA.BoundaryType AS BoundaryType,
         RAC.AssetLengthKM AS ReportAssetLengthKm,
         RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
         RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
@@ -171,13 +173,19 @@ def get_emission_soruces_for_RER(report_table, table_name = None):
         AND (Es.Disposition = 1 OR Es.Disposition = 3)
     """
     return query
-
-def query_reports_view(report_table):
+@setup_query
+def query_reports_view(report_table,table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
     query =  f"""select 
     customer_shortname  as "CustomerShortName",
     rp_id  as "ReportId",
     rp_percentcoverageassets as "ReportPercentCoverageAssets_DH",
     lisa_count as "LisaCount",
+    rp_name as "ReportName",
+    rp_date as "ReportDate",
     rp_label_final as "ReportLabelFinal",
     rp_label_other as "ReportLabelOther",
     bo_name as "BoundaryName",
@@ -187,10 +195,51 @@ def query_reports_view(report_table):
     bo_subplant as "BoundarySubplant",
     bo_region as "BoundaryRegion",
     bo_subregion as "BoundarySubRegion",
-    bo_km_network as "BoundaryKmNetwork"
+    bo_km_network as "BoundaryKmNetwork",
+    EXTRACT(YEAR FROM rp_date) as "Year",
+    EXTRACT(MONTH FROM rp_date) as "Month"
+    {into_clause}
     from dash.v_report 
     where rp_id IN (SELECT LOWER(ReportId::text)::uuid FROM {report_table})"""
     return query
+
+@setup_query
+def query_reports_view_by_year(customer_name, years = None, table_name = None,limit = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    years_str = ", ".join(str(year) for year in years)
+    if limit is not None:
+        limit_clause = f"LIMIT {limit}"
+    else:
+        limit_clause = ""
+    query =  f"""select 
+    customer_shortname  as "customershortname",
+    rp_id  as "reportid",
+    rp_percentcoverageassets as "ReportPercentCoverageAssets_DH",
+    lisa_count as "lisacount",
+    rp_name as "reportname",
+    rp_date as "reportdate",
+    rp_label_final as "reportlabelfinal",
+    rp_label_other as "reportlabelother",
+    bo_name as "boundaryname",
+    bo_mode as "boundarymode",
+    bo_type as "boundarytype",
+    bo_plant as "boundaryplant",
+    bo_subplant as "boundariesubplant",
+    bo_region as "boundaryregion",
+    bo_subregion as "boundariesubregion",
+    bo_km_network as "boundarykmnetwork",
+    EXTRACT(YEAR FROM rp_date) as "Year",
+    EXTRACT(MONTH FROM rp_date) as "Month"
+    {into_clause}
+    from dash.v_report 
+        where customer_shortname = '{customer_name}'
+        and EXTRACT(YEAR FROM rp_date) IN ({years_str})
+        {limit_clause}"""
+    return query
+
 
 
 def reports_view(customer_name, years, is_final_checkbox):
@@ -229,7 +278,12 @@ def reports_view(customer_name, years, is_final_checkbox):
     
     return query
 
-def survey_query(report_table=None):
+@setup_query
+def survey_query(report_table=None,table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
     query = f"""
     SELECT
         UPPER(C.Name) CustomerName,
@@ -279,9 +333,12 @@ def survey_query(report_table=None):
         LEFT JOIN Analyzer A ON S.AnalyzerId = A.Id
         LEFT JOIN SurveyorUnit SU on S.SurveyorUnitId = SU.Id
         LEFT JOIN SurveyModeType SMT on S.SurveyModeTypeId = SMT.Id
-    WHERE R.Id  IN (SELECT ReportId FROM {report_table})"""
+    WHERE R.Id  IN (SELECT ReportId FROM {report_table})
+    {into_clause}
+    """
     return query
 
+@setup_query
 def get_surveys(user_table, start_date = None, survey_table = None, end_date = None):
     if survey_table is not None:
         into_clause = f"INTO {survey_table}"
@@ -306,6 +363,7 @@ def get_surveys(user_table, start_date = None, survey_table = None, end_date = N
         S.EndDateTime,
         S.StabilityClass,
         S.Status,
+        SA.Shape.STAsText() as SurveyArea,
         S.BuildNumber,
         S.AnalyzerId,
         S.ReferenceGasBottleId,
@@ -318,6 +376,7 @@ def get_surveys(user_table, start_date = None, survey_table = None, end_date = N
     DATEDIFF(MINUTE, S.StartDateTime, S.EndDateTime) AS RawDurationMinutes
     {into_clause} FROM Survey s
     JOIN [User] u ON s.UserId = u.Id
+    JOIN SurveyArea SA ON s.Id = SA.SurveyId
     INNER JOIN Analyzer a ON s.AnalyzerId = a.Id
     LEFT JOIN SurveyorUnit su ON s.SurveyorUnitId = su.Id
     WHERE UserId IN (SELECT UserId FROM {user_table})
@@ -327,6 +386,7 @@ def get_surveys(user_table, start_date = None, survey_table = None, end_date = N
         query += f"AND s.StartDateTime <= '{end_date}'"
     return query
 
+@setup_query
 def get_users(customer_name, user_table):
     query = f"""
     SELECT 
@@ -340,7 +400,11 @@ def get_users(customer_name, user_table):
     """
     return query
 
-def emission_sources_table_query_given_report_id(report_table=None):
+def emission_sources_table_query_given_report_id(report_table=None,table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
     query = f"""
     SELECT
         UPPER(CONVERT(NVARCHAR(50), ES.Id))     AS EmissionSourceId,
@@ -408,6 +472,7 @@ def emission_sources_table_query_given_report_id(report_table=None):
          WHERE RL.ReportId = R.Id AND RL.IsActive = 1) AS NumberOfLabels,
         TZ.Description AS CommonTimeZone
     FROM Customer C
+    {into_clause}
         JOIN Report R ON C.Id = R.CustomerID
         JOIN EmissionSource ES ON R.Id = ES.ReportId
         LEFT JOIN Peak P ON ES.RepresentativePeakId = P.Id
@@ -429,12 +494,15 @@ def query_box_table(report_table = None, table_name = None):
         into_clause = ""
     query = f"""SELECT B.Id as BoxId,
                 B.BoxShape.STAsText() as BoxShape,
+                (SELECT Description FROM InvestigationStatusTypes IST WHERE IST.Id = B.InvestigationStatusTypeId) AS InvestigationStatusName,
                 (SELECT BT.Name FROM BoxTypes BT WHERE BT.Id = B.BoxTypeId) AS BoxType,
                 B.ReportId, B.UniqueIdentifier
                 {into_clause}
                 FROM Box B 
                 
-                WHERE B.ReportId IN (SELECT ReportId FROM {report_table})
+                WHERE B.ReportId IN (SELECT ReportId FROM {report_table}) AND
+                B.UniqueIdentifier NOT LIKE '%G-0'AND
+                B.UniqueIdentifier LIKE '%G%'
                 """
     return query
 
@@ -457,3 +525,75 @@ def query_report_investigation(box_table = None, table_name = None):
     FROM ReportInvestigation RI 
     WHERE RI.BoxId IN (SELECT BoxId FROM {box_table})"""
     return query
+
+@setup_query
+def query_InvestigationStatusTypes():
+    IST = InvestigationStatusTypes.copy()
+    query = f"""SELECT {IST.get_columns()} FROM {IST.get_table_name()} IST"""
+    return query
+
+@setup_query
+def query_report_asset_coverage(report_table = None, table_name = None):
+    RAC = ReportAreaCovered.copy()
+    RAC.delete_column('Id')
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query = f"""SELECT {RAC.get_columns()} {into_clause} FROM ReportAreaCovered RAC WHERE RAC.ReportId IN (SELECT ReportId FROM {report_table})"""
+    return query
+
+@setup_query
+def query_emission_sources_table(report_table = None, table_name = None):
+    ES_Columns = EmissionSource.copy()
+    ES_Columns.delete_column('Lisa')
+    ES_Columns.set_column_alias('Id','EmissionSourceId')
+
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query = f"""SELECT {ES_Columns.get_columns()} {into_clause} FROM EmissionSource ES WHERE ES.ReportId IN (SELECT ReportId FROM {report_table})"""
+    return query
+
+@setup_query
+def query_surveys_table(report_table = None, table_name = None):
+    Survey_Columns = Survey.copy()
+    Survey_Columns.delete_column('SurveyAreaBoundary')
+    Survey_Columns.set_column_alias('Id','SurveyId')
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query = f"""SELECT {Survey_Columns.get_columns()},(SELECT Description FROM SurveyorUnit SU WHERE SU.Id = S.SurveyorUnitId) AS SurveyorUnit, RDS.ReportId AS ReportId {into_clause} FROM Survey S JOIN ReportDrivingSurvey RDS ON S.Id = RDS.SurveyId WHERE RDS.ReportId IN (SELECT ReportId FROM {report_table})"""
+    return query
+
+
+@setup_query
+def query_segments_table(survey_table = None, table_name = None):
+    segments_Columns = Segment.copy()
+    segments_Columns.delete_column('Shape')
+    segments_Columns.delete_column('Order')
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query = f"""SELECT {segments_Columns.get_columns()} {into_clause} FROM Segment S WHERE S.SurveyId IN (SELECT SurveyId FROM {survey_table}) """
+    return query
+
+
+@setup_query
+def query_SurveyH3Aggregation(survey_table = None, table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    segment_union_query = f"""
+    SELECT 
+        S.SurveyId,
+        geometry::UnionAggregate(S.Shape).STAsText() AS Breadcrumb
+    {into_clause}
+    FROM Segment S
+    WHERE S.SurveyId IN (SELECT SurveyId FROM {survey_table})
+    GROUP BY S.SurveyId"""
+    return segment_union_query
