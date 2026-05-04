@@ -19,61 +19,34 @@ class Query:
         self.child = None
     def set_parent(self, parent):
         self.parent = parent
-    def _fix_tmp_table_name(self):
-        """
-        Checks for an INTO clause in the query and ensures that any temporary table with a 'tmp_' prefix
-        has a '#' before its table name. Returns the name of the table if found and changed, else None.
-        """
-        import re
 
-        table_name_modified = None
-
-        def fix_into(match):
-            nonlocal table_name_modified
-            into_prefix = match.group(1)
-            table_name = match.group(2)
-            after_name = match.group(3) if match.group(3) else ""
-            # Only add # if 'tmp_' is at the start and not already prefixed with #
-            if table_name.startswith("tmp_") and not table_name.startswith("#tmp_"):
-                table_name_modified = f"#{table_name}"
-                return f"{into_prefix}#{table_name}{after_name}"
-            else:
-                return match.group(0)
-
-        self.query = re.sub(
-            r"(\bINTO\s+)([A-Za-z_][A-Za-z0-9_]*)(\b|\s|$)",
-            fix_into,
-            self.query,
-            flags=re.IGNORECASE
-        )
-        return table_name_modified
     def set_child(self, child):
         self.child = child
         
-    def execute(self,conn):
-        df = None
+    def execute(self,conn, table_return = None):
+        df = []
         if isinstance(conn, list):
             for conn in conn:
-                df_temp = self.execute_sql(conn)
-                if df is None:
-                    df = df_temp
-                else:
-                    df = pd.concat([df, df_temp])
-            return df
+                df.append(self.execute_sql(conn, table_return))
+            return pd.concat(df)
         else:
-            return self.execute_sql(conn)
+            return self.execute_sql(conn, table_return)
 
-
-    def execute_sql(self,conn):
+    def execute_sql(self,conn, table_return = None):
+        if table_return is not None:
+            df = {}
+        else:
+            df = None
         pointer = self
-        df = None
         with conn.engine.connect() as connection:
             while pointer.child is not None:
                 connection.execute(pointer.query)
                 pointer = pointer.child
-            df = pd.read_sql(sql=pointer.query, con=connection)                
-        return df
-
-
-
-    
+            if table_return is not None:
+                connection.execute(pointer.query)
+                for table in table_return:
+                    query = f"""SELECT * FROM {table}"""
+                    df[table] = pd.read_sql(sql=query, con=connection)
+            else:   
+                df = pd.read_sql(sql=pointer.query, con=connection)                
+        return df    

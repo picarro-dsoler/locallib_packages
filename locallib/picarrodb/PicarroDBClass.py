@@ -1,3 +1,4 @@
+import copy
 class DBTable:
     def __init__(self, name, columns=None):
         self.name = name
@@ -14,9 +15,12 @@ class DBTable:
     def get_acronym(self):
         return self.acronym
 
+    def get_table_alias(self):
+        return self.alias
+
     def get_columns(self, format = 'query'):
         if format == 'query':
-            query = [f'{self.acronym}.{column.get_column_name()}.STAsText() as {column.get_column_name()}' if column.datatype == 'geometry' else f'{self.acronym}.{column.get_column_name()}' for column in self.columns]
+            query = [f'{self.acronym}.{column.get_column_name()}.STAsText() as {column.get_column_alias()}' if column.datatype == 'geometry' else f'{self.acronym}.{column.get_column_name()} as {column.get_column_alias()}' for column in self.columns]
             query = ' , '.join(query)
             return query
         elif format == 'list':
@@ -32,6 +36,14 @@ class DBTable:
     def __repr__(self):
         return f'{self.name}'
 
+    def set_column_alias(self, column_name, alias):
+        for col in self.columns:
+            if col.name == column_name:
+                col.set_column_alias(alias)
+                break
+        else:
+            raise ValueError(f'Column {column_name} not found in table {self.name}')
+
     def delete_column(self, column_name):
         for col in self.columns:    
             if col.name == column_name:
@@ -41,13 +53,24 @@ class DBTable:
         else:
             raise ValueError(f'Column {column_name} not found in table {self.name}')
 
+    
+    def copy(self):
+        return copy.copy(self)
+
 class DBColumn:
     def __init__(self, name, datatype = None):
         self.name = name
         self.datatype = datatype
+        self.alias = name
 
     def get_column_name(self):
         return self.name
+    
+    def set_column_alias(self, alias):
+        self.alias = alias
+
+    def get_column_alias(self):
+        return self.alias
     
     def __repr__(self):
         return f'{self.name}'
