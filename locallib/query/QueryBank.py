@@ -41,13 +41,17 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         RAC.AssetLengthKM AS ReportAssetLengthKm,
         RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
         RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
+        RAC.DistributionPipeKm,
         RAC.DistributionPipeCoveredKm,
         RAC.DistributionPipePercentCovered,
         RAC.ServicePipeKm,
         RAC.ServicePipeCoveredKm,
+        RAC.AreaKM2,
+        RAC.AreaCoveredKM2,
         YEAR(R.DateStarted) AS ReportYear,
-        MONTH(R.DateStarted) AS ReportMonth
-   
+        MONTH(R.DateStarted) AS ReportMonth,
+        DATEPART(WEEK, R.DateStarted) AS ReportWeek,
+        DATEPART(QUARTER, R.DateStarted) AS ReportQuarter
     {into_clause}
     FROM
         Report R
@@ -400,6 +404,7 @@ def get_users(customer_name, user_table):
     """
     return query
 
+@setup_query
 def emission_sources_table_query_given_report_id(report_table=None,table_name = None):
     if table_name is not None:
         into_clause = f"INTO {table_name}"
@@ -471,19 +476,17 @@ def emission_sources_table_query_given_report_id(report_table=None,table_name = 
          INNER JOIN Label L ON RL.LabelId = L.Id
          WHERE RL.ReportId = R.Id AND RL.IsActive = 1) AS NumberOfLabels,
         TZ.Description AS CommonTimeZone
-    FROM Customer C
     {into_clause}
-        JOIN Report R ON C.Id = R.CustomerID
-        JOIN EmissionSource ES ON R.Id = ES.ReportId
-        LEFT JOIN Peak P ON ES.RepresentativePeakId = P.Id
-        LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
-        LEFT JOIN ReportStatusType RST ON R.ReportStatusTypeId = RST.Id
-        LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
-        INNER JOIN ReportType ON R.ReportTypeId = ReportType.Id
-        INNER JOIN TimeZone TZ ON R.TimeZoneId = TZ.Id
-    WHERE R.Id IN (SELECT ReportId FROM {report_table})
-      AND (ES.Disposition = 1 OR ES.Disposition = 3)
-    """
+    FROM Customer C
+    JOIN Report R ON C.Id = R.CustomerID
+    JOIN EmissionSource ES ON R.Id = ES.ReportId
+    LEFT JOIN Peak P ON ES.RepresentativePeakId = P.Id
+    LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
+    LEFT JOIN ReportStatusType RST ON R.ReportStatusTypeId = RST.Id
+    LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
+    INNER JOIN ReportType ON R.ReportTypeId = ReportType.Id
+    INNER JOIN TimeZone TZ ON R.TimeZoneId = TZ.Id
+    WHERE R.Id IN (SELECT ReportId FROM {report_table}) AND (ES.Disposition = 1 OR ES.Disposition = 3)"""
     return query
 
 @setup_query
@@ -494,6 +497,7 @@ def query_box_table(report_table = None, table_name = None):
         into_clause = ""
     query = f"""SELECT B.Id as BoxId,
                 B.BoxShape.STAsText() as BoxShape,
+                B.EmissionSourceId as EmissionSourceId,
                 (SELECT Description FROM InvestigationStatusTypes IST WHERE IST.Id = B.InvestigationStatusTypeId) AS InvestigationStatusName,
                 (SELECT BT.Name FROM BoxTypes BT WHERE BT.Id = B.BoxTypeId) AS BoxType,
                 B.ReportId, B.UniqueIdentifier
@@ -502,7 +506,7 @@ def query_box_table(report_table = None, table_name = None):
                 
                 WHERE B.ReportId IN (SELECT ReportId FROM {report_table}) AND
                 B.UniqueIdentifier NOT LIKE '%G-0'AND
-                B.UniqueIdentifier LIKE '%G%'
+                B.UniqueIdentifier LIKE '%L%'
                 """
     return query
 
@@ -565,7 +569,15 @@ def query_surveys_table(report_table = None, table_name = None):
         into_clause = f"INTO {table_name}"
     else:
         into_clause = ""
-    query = f"""SELECT {Survey_Columns.get_columns()},(SELECT Description FROM SurveyorUnit SU WHERE SU.Id = S.SurveyorUnitId) AS SurveyorUnit, RDS.ReportId AS ReportId {into_clause} FROM Survey S JOIN ReportDrivingSurvey RDS ON S.Id = RDS.SurveyId WHERE RDS.ReportId IN (SELECT ReportId FROM {report_table})"""
+    query = f"""SELECT {Survey_Columns.get_columns()},
+    SQC.LateralRotation as LateralRotation,
+    SQC.NumberOfPeaks as NumberOfPeaks,
+    (SELECT Description FROM SurveyorUnit SU WHERE SU.Id = S.SurveyorUnitId) AS SurveyorUnit, 
+    RDS.ReportId AS ReportId 
+    {into_clause} FROM Survey S 
+    JOIN ReportDrivingSurvey RDS ON S.Id = RDS.SurveyId
+    JOIN SurveyQACheck SQC ON S.Id = SQC.SurveyId
+    WHERE RDS.ReportId IN (SELECT ReportId FROM {report_table})"""
     return query
 
 
@@ -596,4 +608,24 @@ def query_SurveyH3Aggregation(survey_table = None, table_name = None):
     FROM Segment S
     WHERE S.SurveyId IN (SELECT SurveyId FROM {survey_table})
     GROUP BY S.SurveyId"""
+    return segment_union_query
+
+
+@setup_query
+def query_SurveyH3Aggregation_byReport(report_table = None, table_name: str = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    segment_union_query = f"""
+    SELECT 
+        RDS.ReportId AS ReportId,
+        S.SurveyId,
+        geometry::UnionAggregate(S.Shape).STAsText() AS Breadcrumb
+    {into_clause}
+    FROM Segment S
+    JOIN ReportDrivingSurvey RDS ON S.SurveyId = RDS.SurveyId
+    WHERE RDS.ReportId IN (SELECT ReportId FROM {report_table})
+    GROUP BY S.SurveyId,
+    RDS.ReportId"""
     return segment_union_query
