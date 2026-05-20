@@ -584,13 +584,13 @@ def query_surveys_table(report_table = None, table_name = None):
 @setup_query
 def query_segments_table(survey_table = None, table_name = None):
     segments_Columns = Segment.copy()
-    segments_Columns.delete_column('Shape')
+    #segments_Columns.delete_column('Shape')
     segments_Columns.delete_column('Order')
     if table_name is not None:
         into_clause = f"INTO {table_name}"
     else:
         into_clause = ""
-    query = f"""SELECT {segments_Columns.get_columns()} {into_clause} FROM Segment S WHERE S.SurveyId IN (SELECT SurveyId FROM {survey_table}) """
+    query = f"""SELECT {segments_Columns.get_columns()}, S.[Order] as [Order] {into_clause} FROM Segment S WHERE S.SurveyId IN (SELECT SurveyId FROM {survey_table}) """
     return query
 
 
@@ -628,4 +628,22 @@ def query_SurveyH3Aggregation_byReport(report_table = None, table_name: str = No
     WHERE RDS.ReportId IN (SELECT ReportId FROM {report_table})
     GROUP BY S.SurveyId,
     RDS.ReportId"""
+    return segment_union_query
+
+def query_Segments_byReport(report_table = None, table_name: str = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    segment_union_query = f"""
+    SELECT 
+        RDS.ReportId AS ReportId,
+        S.SurveyId,
+        S.Shape.STAsText() AS Breadcrumb,
+        S.[Order] as [Order]
+    {into_clause}
+    FROM Segment S
+    JOIN ReportDrivingSurvey RDS ON S.SurveyId = RDS.SurveyId
+    WHERE RDS.ReportId IN (SELECT ReportId FROM {report_table})
+    """
     return segment_union_query
