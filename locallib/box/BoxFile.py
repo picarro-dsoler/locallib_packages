@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 from gasanalytics.box import *
 from pathlib import Path
 import warnings

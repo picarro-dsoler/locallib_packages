@@ -18,6 +18,10 @@ class DBTable:
     def get_table_alias(self):
         return self.alias
 
+    def create_table(self, arguments = None):
+        pass
+    
+
     def get_columns(self, format = 'query'):
         if format == 'query':
             query = [f'{self.acronym}.{column.get_column_name()}.STAsText() as {column.get_column_alias()}' if column.datatype == 'geometry' else f'{self.acronym}.{column.get_column_name()} as {column.get_column_alias()}' for column in self.columns]
@@ -58,11 +62,14 @@ class DBTable:
         return copy.copy(self)
 
 class DBColumn:
-    def __init__(self, name, datatype = None):
+    def __init__(self, name, datatype = None, key = None):
         self.name = name
         self.datatype = datatype
         self.alias = name
-
+        self.key = key
+        if key is not None:
+            if key not in ['primary', 'foreign']:
+                raise ValueError(f'Invalid key: {key}')
     def get_column_name(self):
         return self.name
     
