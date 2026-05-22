@@ -405,6 +405,92 @@ def get_users(customer_name, user_table):
     return query
 
 @setup_query
+def emission_sources_table_dispo2_given_report_id(report_table=None,table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query = f"""
+    SELECT
+        UPPER(CONVERT(NVARCHAR(50), ES.Id))     AS EmissionSourceId,
+        ES.PeakNumber AS LisaNumber,
+        CASE
+            WHEN ES.UniqueIdentifier IS NOT NULL THEN ES.UniqueIdentifier
+            ELSE
+                CONCAT(
+                    'CR-',
+                    SUBSTRING(CONVERT(nvarchar(50), ES.ReportId), 1, 6),
+                    CASE
+                        WHEN ES.PeakNumber >= 0 THEN '-L-'
+                        ELSE '-LF-'
+                    END,
+                    ABS(ES.PeakNumber)
+                )
+        END AS UniqueIdentifier,
+        ES.CH4,
+        ES.ClassificationConfidence,
+        ES.RepresentativePeakId,
+        ES.PriorityScore2,
+        ES.Disposition,
+        ES.DetectionProbability,
+        ES.EmissionRate,
+        ES.EmissionRateAMean,
+        ES.EmissionRateAStd,
+        ES.EmissionRateGMean,
+        ES.EmissionRateGStd,
+        ES.EmissionRateLowerBound,
+        ES.EmissionRateUpperBound,
+        ES.EthaneRatio,
+        ES.EthaneRatioUncertainty,
+        ES.GeocodeAddress,
+        ES.GpsLatitude AS LisaLatitude,
+        ES.GpsLongitude AS LisaLongitude,
+        ES.Lisa.STAsText() AS LisaGeometry,
+        ES.IsFiltered,
+        ES.MaxAmplitude,
+        ES.MaxCarSpeed,
+        ROUND(CAST(ES.NumberOfPeaks AS FLOAT) / NULLIF(CAST(ES.NumberOfPasses AS FLOAT), 0), 2) AS Persistence,
+        ES.MaxWindSpeed,
+        ES.MinWindSpeed,
+        ES.NumberOfPasses,
+        ES.NumberOfPeaks,
+        ES.PeakNumber,
+        ES.PriorityScore,
+        ES.RankingGroup AS RiskRankingBin,
+        (SELECT SurveyId FROM Peak WHERE Id = ES.RepresentativePeakId) AS SurveyId,
+        ES.ReportId,
+        ES.EmissionRate * 0.471947 AS "EmissionRate(lpm)",
+        ES.EmissionRate * 19.1 AS "EmissionRate(g/h)",
+        ES.RepresentativeEmissionRate,
+        ES.RepresentativeEmissionRate * 0.471947 AS "RepresentativeEmissionRate(lpm)",
+        ES.RepresentativeEmissionRate * 19.1 AS "RepresentativeEmissionRate(g/h)",
+        ES.RepresentativeBinLabel,
+        P.EpochTime AS RepresentativePeakEpochTime,
+        STUFF((SELECT DISTINCT ' | ' + L.Title
+               FROM ReportLabel RL
+               INNER JOIN Label L ON RL.LabelId = L.Id
+               WHERE RL.ReportId = R.Id AND RL.IsActive = 1
+               FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS Labels,
+        (SELECT COUNT(DISTINCT L.Title)
+         FROM ReportLabel RL
+         INNER JOIN Label L ON RL.LabelId = L.Id
+         WHERE RL.ReportId = R.Id AND RL.IsActive = 1) AS NumberOfLabels,
+        TZ.Description AS CommonTimeZone
+    {into_clause}
+    FROM Customer C
+    JOIN Report R ON C.Id = R.CustomerID
+    JOIN EmissionSource ES ON R.Id = ES.ReportId
+    LEFT JOIN Peak P ON ES.RepresentativePeakId = P.Id
+    LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
+    LEFT JOIN ReportStatusType RST ON R.ReportStatusTypeId = RST.Id
+    LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
+    INNER JOIN ReportType ON R.ReportTypeId = ReportType.Id
+    INNER JOIN TimeZone TZ ON R.TimeZoneId = TZ.Id
+    WHERE R.Id IN (SELECT ReportId FROM {report_table})"""
+    return query
+
+
+@setup_query
 def emission_sources_table_query_given_report_id(report_table=None,table_name = None):
     if table_name is not None:
         into_clause = f"INTO {table_name}"

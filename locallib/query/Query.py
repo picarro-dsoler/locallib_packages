@@ -38,15 +38,29 @@ class Query:
         else:
             df = None
         pointer = self
-        with conn.engine.connect() as connection:
-            while pointer.child is not None:
-                connection.execute(pointer.query)
-                pointer = pointer.child
-            if table_return is not None:
-                connection.execute(pointer.query)
-                for table in table_return:
-                    query = f"""SELECT * FROM {table}"""
-                    df[table] = pd.read_sql(sql=query, con=connection)
-            else:   
-                df = pd.read_sql(sql=pointer.query, con=connection)                
+        #Classify the connection type, make a change only when there is sqllite
+        if conn.dbtype == 'sqlite':
+            with conn.engine as connection:
+                while pointer.child is not None:
+                    connection.execute(pointer.query)
+                    pointer = pointer.child
+                if table_return is not None:
+                    connection.execute(pointer.query)
+                    for table in table_return:
+                        query = f"""SELECT * FROM {table}"""
+                        df[table] = pd.read_sql(sql=query, con=connection)
+                else:   
+                    df = pd.read_sql(sql=pointer.query, con=connection)                
+        else: 
+            with conn.engine.connect() as connection:
+                while pointer.child is not None:
+                    connection.execute(pointer.query)
+                    pointer = pointer.child
+                if table_return is not None:
+                    connection.execute(pointer.query)
+                    for table in table_return:
+                        query = f"""SELECT * FROM {table}"""
+                        df[table] = pd.read_sql(sql=query, con=connection)
+                else:   
+                    df = pd.read_sql(sql=pointer.query, con=connection)                
         return df    

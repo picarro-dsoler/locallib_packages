@@ -75,7 +75,7 @@ try:
     print("EU1_Conn created successfully")
 except Exception as e:
     print(f"Error creating EU1_Conn: {e}")
-    EU1_DB = None
+    EU1_Cinn = None
 
 try:
     EU2_Conn = EUConnection(host="eu-prd2-sqlsrv-ee-db01.czz1yneu9gmr.eu-central-1.rds.amazonaws.com", user=EU2_USER, password=EU2_PASSWORD, database="EU-SurveyorProduction2")
