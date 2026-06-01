@@ -1,4 +1,4 @@
-from locallib.picarrodb import DBColumn, DBTable
+from .PicarroDBClass import DBColumn, DBTable
 #Table 1/172: __MigrationHistory
 __MigrationHistory = DBTable('__MigrationHistory')
 __MigrationHistory.add_column(DBColumn('MigrationId', datatype='nvarchar'))
