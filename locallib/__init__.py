@@ -69,7 +69,8 @@ from .pandas import (
     SCFH_TO_G_PER_HOUR,        # Standard cubic feet per hour to grams per hour conversion
     SCFH_TO_SLPM_FACTOR,       # SCFH to standard liters per minute conversion factor
     PandasDBAccessor,          # Pandas database accessor extension
-    EmissionRateAccessor       # Pandas emission rate conversion extension
+    EmissionRateAccessor,       # Pandas emission rate conversion extension
+    NOPAccessor,               # Pandas NOP accessor extension
 )
 
 # ETL (Extract, Transform, Load) utilities
@@ -121,7 +122,8 @@ __all__ = [
     'SCFH_TO_SLPM_FACTOR',     # SCFH to SLPM conversion factor
     'PandasDBAccessor',        # Pandas database accessor extension
     'EmissionRateAccessor',    # Pandas emission rate conversion extension
-    
+    'NOPAccessor',             # Pandas NOP accessor extension
+
     # ETL utilities
     'ConfigParameters', # Configuration parameter management
     'Loggers'          # Logging utilities and setup
