@@ -59,8 +59,7 @@ class DBTable:
 
     
     def copy(self):
-        return copy.copy(self)
-
+        return DBTable(self.name, self.columns.copy())
 class DBColumn:
     def __init__(self, name, datatype = None, key = None):
         self.name = name
