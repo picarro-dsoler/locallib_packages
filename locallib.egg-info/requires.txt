@@ -1,0 +1,8 @@
+pandas>=1.0.0
+numpy>=1.18.0
+python-dotenv
+
+[dev]
+pytest>=6.0
+black
+flake8

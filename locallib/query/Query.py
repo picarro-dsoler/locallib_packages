@@ -2,9 +2,8 @@ import logging
 import os
 import time
 import pandas as pd
-from apps_dal_sql.sessionfactory import SessionFactory
-from apps_dal_sql.cursorfactory import CursorFactory
 from dotenv import load_dotenv
+from sqlalchemy import text
 # Removed PicarroDB import - functions are defined locally
 load_dotenv(override=True)
 
@@ -42,25 +41,28 @@ class Query:
         if conn.dbtype == 'sqlite':
             with conn.engine as connection:
                 while pointer.child is not None:
-                    connection.execute(pointer.query)
+                    connection.execute(text(pointer.query)).close()
                     pointer = pointer.child
                 if table_return is not None:
-                    connection.execute(pointer.query)
+                    connection.execute(text(pointer.query)).close()
                     for table in table_return:
-                        query = f"""SELECT * FROM {table}"""
-                        df[table] = pd.read_sql(sql=query, con=connection)
-                else:   
-                    df = pd.read_sql(sql=pointer.query, con=connection)                
-        else: 
+                        result = connection.execute(text(f"SELECT * FROM {table}"))
+                        df[table] = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
+                else:
+                    result = connection.execute(text(pointer.query))
+                    df = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
+        else:
             with conn.engine.connect() as connection:
+                connection.execute(text("SET NOCOUNT ON")).close()
                 while pointer.child is not None:
-                    connection.execute(pointer.query)
+                    connection.execute(text(pointer.query)).close()
                     pointer = pointer.child
                 if table_return is not None:
-                    connection.execute(pointer.query)
+                    connection.execute(text(pointer.query)).close()
                     for table in table_return:
-                        query = f"""SELECT * FROM {table}"""
-                        df[table] = pd.read_sql(sql=query, con=connection)
-                else:   
-                    df = pd.read_sql(sql=pointer.query, con=connection)                
-        return df    
+                        result = connection.execute(text(f"SELECT * FROM {table}"))
+                        df[table] = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
+                else:
+                    result = connection.execute(text(pointer.query))
+                    df = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
+        return df

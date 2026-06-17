@@ -42,7 +42,7 @@ class EUConnection(PConnection):
     def set_engine(self):
         return create_engine(
             f"mssql+pyodbc://{self.user}:{self.password}@{self.host}:1433/{self.database}?"
-            "driver=ODBC+Driver+17+for+SQL+Server")
+            "driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes")
     
 class DataHubConnection(PConnection):
     def __init__(self, host: str, database: str, user: str, password: str):

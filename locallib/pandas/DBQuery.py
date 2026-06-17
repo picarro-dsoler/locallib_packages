@@ -17,9 +17,16 @@ class DBAccessor:
         self._obj = pandas_obj
         self.parent = None
         self.child = None
-        self.query = None
         self.conn = None
     
+    @property
+    def query(self):
+        return self._obj.attrs.get('_db_query')
+
+    @query.setter
+    def query(self, value):
+        self._obj.attrs['_db_query'] = value
+
     def set_connection(self, conn):
         self.conn = conn
         return self._obj
@@ -50,6 +57,16 @@ class DBAccessor:
             temp_conn.close()
             return df
 
+    @staticmethod
+    def _query_via_cursor(dbapi_conn, query) -> pd.DataFrame:
+        """Execute a query on a raw DBAPI connection and return a DataFrame."""
+        sql = query if isinstance(query, str) else str(getattr(query, 'text', query))
+        with dbapi_conn.cursor() as cur:
+            cur.execute(sql)
+            cols = [d[0] for d in cur.description]
+            rows = [tuple(row) for row in cur.fetchall()]
+            return pd.DataFrame(rows, columns=cols)
+
     def execute_sql(self, Conn, source_col: str, temp_table_name: str = "#tmp_single_col", sql_col_name:  None = None, varchar_len: int = 4000, chunksize: int = 10000, erase_table: bool = True, fillna: bool = False):
         if Conn.dbtype == 'mssql':
             temp_name, temp_conn = self.upload_single_column_to_temp_sqlserver(self._obj,Conn=Conn, source_col=source_col, temp_table_name=temp_table_name, sql_col_name=sql_col_name, varchar_len=varchar_len, chunksize=chunksize, erase_table=erase_table)
@@ -58,20 +75,16 @@ class DBAccessor:
         else:
             raise ValueError(f"Unsupported database type: {Conn.dbtype}")
         
-        # Suppress pandas UserWarning about DBAPI connections while keeping temp_conn alive
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", 
-                                  message=".*pandas only supports SQLAlchemy connectable.*",
-                                  category=UserWarning)
-            if isinstance(self.query, list):
-                df = None
-                for query in self.query:
-                    if df is None:
-                        df = pd.read_sql(query, temp_conn)
-                    else:
-                        df = pd.merge(df, pd.read_sql(query, temp_conn), on=source_col, how='left')
-            else:
-                df = pd.read_sql(self.query, temp_conn)
+        if isinstance(self.query, list):
+            df = None
+            for query in self.query:
+                temp_df = self._query_via_cursor(temp_conn, query)
+                if df is None:
+                    df = temp_df
+                else:
+                    df = pd.merge(df, temp_df, on=source_col, how='left')
+        else:
+            df = self._query_via_cursor(temp_conn, self.query)
 
         if 'id' in source_col.lower() or 'Id' in source_col:
             df[source_col] = df[source_col].astype(str).str.upper()
@@ -136,7 +149,7 @@ class DBAccessor:
             sql_type = "BIGINT"            # safe for NA-containing integer series
         elif dtype.startswith("int"):
             sql_type = "BIGINT" if dtype == "int64" else "INT"
-        elif dtype.startswith("float") or np.issubdtype(s.dtype, np.floating):
+        elif dtype.startswith("float") or (isinstance(s.dtype, np.dtype) and np.issubdtype(s.dtype, np.floating)):
             sql_type = "FLOAT"
         elif dtype == "bool":
             sql_type = "BIT"
@@ -261,7 +274,7 @@ class DBAccessor:
             sql_type = "BIGINT"            # safe for NA-containing integer series
         elif dtype.startswith("int"):
             sql_type = "BIGINT" if dtype == "int64" else "INTEGER"
-        elif dtype.startswith("float") or np.issubdtype(s.dtype, np.floating):
+        elif dtype.startswith("float") or (isinstance(s.dtype, np.dtype) and np.issubdtype(s.dtype, np.floating)):
             sql_type = "DOUBLE PRECISION"
         elif dtype == "bool":
             sql_type = "BOOLEAN"

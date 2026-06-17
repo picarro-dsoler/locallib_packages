@@ -26,8 +26,6 @@ setup(
     install_requires=[
         "pandas>=1.0.0",
         "numpy>=1.18.0",
-        "gasanalytics",
-        "apps_dal_sql",
         "python-dotenv",
     ],
     extras_require={
