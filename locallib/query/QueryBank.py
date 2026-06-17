@@ -34,13 +34,17 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         END AS ReportName,
         R.Id AS ReportId,
         R.ReportTitle AS ReportTitle,
-        L.Title AS Label,
         R.DateStarted AS ReportDate,
         RA.ExternalId AS BoundaryName,
         RA.BoundaryType AS BoundaryType,
         RAC.AssetLengthKM AS ReportAssetLengthKm,
         RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
         RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
+        STUFF((SELECT DISTINCT ', ' + L.Title
+               FROM ReportLabel RL
+               INNER JOIN Label L ON RL.LabelId = L.Id
+               WHERE RL.ReportId = R.Id AND RL.IsActive = 1 AND L.Title IS NOT NULL
+               FOR XML PATH(''), TYPE).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS Labels,
         RAC.DistributionPipeKm,
         RAC.DistributionPipeCoveredKm,
         RAC.DistributionPipePercentCovered,
@@ -71,6 +75,26 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         AND L.Title = 'Final Checkbox'
         AND RL.IsActive = 1
         {year_filter}
+
+    GROUP BY
+        C.Name,
+        R.Id,
+        R.ReportTitle,
+        R.DateStarted,
+        RA.ExternalId,
+        RA.BoundaryType,
+        RAC.AssetLengthKM,
+        ReportType.Description,
+        RAC.AssetLengthKM,
+        RAC.AreaCoveredKM2,
+        RC.PercentCoverageAssets,
+        RAC.DistributionPipeKm,
+        RAC.DistributionPipeCoveredKm,
+        RAC.DistributionPipePercentCovered,
+        RAC.ServicePipeKm,
+        RAC.ServicePipeCoveredKm,
+        RAC.AreaKM2,
+        RAC.AreaCoveredKM2
     """
     return query
 
@@ -205,6 +229,36 @@ def query_reports_view(report_table,table_name = None):
     {into_clause}
     from dash.v_report 
     where rp_id IN (SELECT LOWER(ReportId::text)::uuid FROM {report_table})"""
+    return query
+
+def query_reports_view_by_name(report_table,table_name = None):
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+    query =  f"""select 
+    customer_shortname  as "CustomerShortName",
+    rp_id  as "ReportId",
+    rp_percentcoverageassets as "ReportPercentCoverageAssets_DH",
+    lisa_count as "LisaCount",
+    rp_name as "ReportName",
+    rp_date as "ReportDate",
+    rp_title as "ReportTitle",
+    rp_label_final as "ReportLabelFinal",
+    rp_label_other as "ReportLabelOther",
+    bo_name as "BoundaryName",
+    bo_mode as "BoundaryMode",
+    bo_type as "BoundaryType",
+    bo_plant as "BoundaryPlant",
+    bo_subplant as "BoundarySubplant",
+    bo_region as "BoundaryRegion",
+    bo_subregion as "BoundarySubRegion",
+    bo_km_network as "BoundaryKmNetwork",
+    EXTRACT(YEAR FROM rp_date) as "Year",
+    EXTRACT(MONTH FROM rp_date) as "Month"
+    {into_clause}
+    from dash.v_report 
+    where rp_name IN (SELECT ReportName FROM {report_table})"""
     return query
 
 @setup_query
@@ -661,8 +715,8 @@ def query_surveys_table(report_table = None, table_name = None):
     (SELECT Description FROM SurveyorUnit SU WHERE SU.Id = S.SurveyorUnitId) AS SurveyorUnit, 
     RDS.ReportId AS ReportId 
     {into_clause} FROM Survey S 
-    JOIN ReportDrivingSurvey RDS ON S.Id = RDS.SurveyId
-    JOIN SurveyQACheck SQC ON S.Id = SQC.SurveyId
+    LEFT JOIN ReportDrivingSurvey RDS ON S.Id = RDS.SurveyId
+    LEFT JOIN SurveyQACheck SQC ON S.Id = SQC.SurveyId
     WHERE RDS.ReportId IN (SELECT ReportId FROM {report_table})"""
     return query
 
