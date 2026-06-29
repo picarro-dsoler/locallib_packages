@@ -130,8 +130,6 @@ class DBAccessor:
         dtype = str(s.dtype)
         if looks_like_uuid_series(s):
             sql_type = "UNIQUEIDENTIFIER"
-        elif dtype.startswith("object"):
-            sql_type = "UNIQUEIDENTIFIER"
         elif dtype.startswith("int") and s.isna().any():
             sql_type = "BIGINT"            # safe for NA-containing integer series
         elif dtype.startswith("int"):
@@ -164,9 +162,9 @@ class DBAccessor:
                 return float(v)
             if isinstance(v, np.bool_):
                 return bool(v)
-            if isinstance(v, object):
-                return str(v).lower()
-            return v
+            if isinstance(v, str):
+                return v.lower() if sql_type == "UNIQUEIDENTIFIER" else v
+            return str(v)
 
         rows = [(coerce(v),) for v in s.tolist()]
 

@@ -8,6 +8,8 @@ from .PConnection import (
     DataHubConnection, 
     EU1_Conn, 
     EU2_Conn, 
+    EU1_PROD_Conn,
+    EU2_PROD_Conn,
     DATAHUB_Conn,
     US_Conn
 )
@@ -21,6 +23,8 @@ __all__ = [
     'DataHubConnection',
     'EU1_Conn', 
     'EU2_Conn',
+    'EU1_PROD_Conn',
+    'EU2_PROD_Conn',
     'DATAHUB_Conn',
     'US_Conn',
     'DBTable',
