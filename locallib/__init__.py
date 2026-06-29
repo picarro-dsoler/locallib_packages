@@ -42,6 +42,8 @@ from .picarrodb import (
     DataHubConnection,  # DataHub connection
     EU1_Conn,          # EU1 server connection instance
     EU2_Conn,          # EU2 server connection instance
+    EU1_PROD_Conn,    # EU1 PROD server connection instance
+    EU2_PROD_Conn,    # EU2 PROD server connection instance
     DATAHUB_Conn,      # DataHub connection instance
     US_Conn,           # US server connection instance
     
@@ -103,6 +105,8 @@ __all__ = [
     'DataHubConnection', # DataHub connection
     'EU1_Conn',         # EU1 server connection instance
     'EU2_Conn',         # EU2 server connection instance
+    'EU1_PROD_Conn',    # EU1 PROD server connection instance
+    'EU2_PROD_Conn',    # EU2 PROD server connection instance
     'DATAHUB_Conn',     # DataHub connection instance
     'US_Conn',          # US server connection instance
     'DBTable',          # Database table representation

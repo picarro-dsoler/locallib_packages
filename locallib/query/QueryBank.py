@@ -349,7 +349,7 @@ def query_reports_view_by_year(customer_name, years = None, table_name = None,li
     return query
 
 
-
+@setup_query
 def reports_view(customer_name, years, is_final_checkbox):
     # Convert the list of years to a string for the SQL IN clause
     years_str = ', '.join(map(str, years))

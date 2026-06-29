@@ -2,6 +2,7 @@ import os
 import warnings
 import pandas as pd
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from typing import Tuple
@@ -40,9 +41,12 @@ class EUConnection(PConnection):
         super().__init__(host, database, user, password, dbtype = 'mssql')
             
     def set_engine(self):
+        user = quote_plus(self.user or "")
+        password = quote_plus(self.password or "")
+        database = quote_plus(self.database or "")
         return create_engine(
-            f"mssql+pyodbc://{self.user}:{self.password}@{self.host}:1433/{self.database}?"
-            "driver=ODBC+Driver+17+for+SQL+Server")
+            f"mssql+pyodbc://{user}:{password}@{self.host}:1433/{database}?"
+            "driver=ODBC+Driver+17+for+SQL+Server&Encrypt=yes&TrustServerCertificate=yes")
     
 class DataHubConnection(PConnection):
     def __init__(self, host: str, database: str, user: str, password: str):
@@ -60,6 +64,14 @@ EU1_PASSWORD = os.getenv("EUDBPW")
 #EU2 credentials
 EU2_USER = os.getenv("EU2DBUSER")
 EU2_PASSWORD = os.getenv("EU2DBPW")
+
+#EU1 PROD credentials
+EU1_PROD_USER = os.getenv("EUPRODDBUSER")
+EU1_PROD_PASSWORD = os.getenv("EUPRODDBPW")
+
+#EU2 PROD credentials
+EU2_PROD_USER = os.getenv("EU2PRODDBUSER")
+EU2_PROD_PASSWORD = os.getenv("EU2PRODDBPW")
 
 #US credentials
 US_USER = os.getenv("USDBUSER")
@@ -98,10 +110,16 @@ except Exception as e:
     print(f"Error creating US_Conn: {e}")
     US_Conn = None
 
+try:
+    EU1_PROD_Conn = EUConnection(host="eu-prodstg-sqlsrv-ee-db01.czz1yneu9gmr.eu-central-1.rds.amazonaws.com", user=EU1_PROD_USER, password=EU1_PROD_PASSWORD, database="EU-SurveyorProdstg")
+    print("EU1_PROD_Conn created successfully")
+except Exception as e:
+    print(f"Error creating EU1_PROD_Conn: {e}")
+    EU1_PROD_Conn = None
 
-
-
-
-
-
-
+try:
+    EU2_PROD_Conn = EUConnection(host="eu-prodstg-sqlsrv-ee-db01.czz1yneu9gmr.eu-central-1.rds.amazonaws.com", user=EU2_PROD_USER, password=EU2_PROD_PASSWORD, database="EU-SurveyorProdstg2")
+    print("EU2_PROD_Conn created successfully")
+except Exception as e:
+    print(f"Error creating EU2_PROD_Conn: {e}")
+    EU2_PROD_Conn = None
