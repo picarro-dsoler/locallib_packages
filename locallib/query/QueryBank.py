@@ -8,6 +8,73 @@ def setup_query(query_func):
     return wrapper
 
 @setup_query
+def get_report_info(report_table, table_name = None):
+    # Always fully qualify ReportId when ambiguous (table.ReportId)
+    report_id_filter = f"R.Id IN (SELECT t.ReportId FROM {report_table} t)"
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+
+    query = f"""
+    WITH SurveyCTE AS (
+        SELECT 
+            S.Id AS SurveyId,
+            S.StartDateTime,
+            S.EndDateTime,
+            RDS.ReportId
+        FROM
+            Survey S
+            INNER JOIN ReportDrivingSurvey RDS on S.Id = RDS.SurveyId
+            WHERE RDS.ReportId IN (SELECT t.ReportId FROM {report_table} t)
+    )
+    SELECT 
+        C.Name AS CustomerName,
+        CASE
+            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+        END AS ReportName,
+        R.Id AS ReportId,
+        R.ReportTitle AS ReportTitle,
+        L.Title AS Label,
+        -- Get the earliest and latest survey start time per report from SurveyCTE
+        (SELECT MIN(StartDateTime) FROM SurveyCTE WHERE SurveyCTE.ReportId = R.Id) AS EarliestSurveyStart,
+        (SELECT MAX(StartDateTime) FROM SurveyCTE WHERE SurveyCTE.ReportId = R.Id) AS LatestSurveyStart,
+        R.DateStarted AS ReportDate,
+        RA.ExternalId AS BoundaryName,
+        RA.Shape.STAsText() AS BoundaryGeometry,
+        RAC.AssetLengthKM AS ReportAssetLengthKm,
+        RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
+        RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
+        RAC.DistributionPipeCoveredKm,
+        RAC.DistributionPipeKm,
+        RAC.DistributionPipePercentCovered,
+        RAC.ServicePipeKm,
+        RAC.ServicePipeCoveredKm,
+        (SELECT Description from TimeZone where Id = R.TimeZoneId) AS TimeZone
+    {into_clause}
+    FROM
+        Report R
+    LEFT JOIN Customer C ON
+        R.CustomerId = C.Id
+    LEFT JOIN ReportLabel RL ON
+        R.Id = RL.ReportId
+    LEFT JOIN Label L ON
+        RL.LabelId = L.Id
+    LEFT JOIN ReportType ON
+        R.ReportTypeId = ReportType.Id
+    LEFT JOIN ReportArea RA ON R.Id = RA.ReportId
+    LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
+    LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
+    WHERE
+        {report_id_filter}
+    AND L.Title = 'Final Checkbox'
+        AND RL.IsActive = 1 
+    """
+    return query
+
+@setup_query
 def get_reports(customer_name, table_name = None, years=None, final_checkbox = True):
     year_filter = ""
     if years:
