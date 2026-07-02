@@ -7,6 +7,88 @@ def setup_query(query_func):
         return Query(query = query)
     return wrapper
 
+def get_report_info(report_table, table_name = None):
+    # Always fully qualify ReportId when ambiguous (table.ReportId)
+    report_id_filter = f"R.Id IN (SELECT t.ReportId FROM {report_table} t)"
+    if table_name is not None:
+        into_clause = f"INTO {table_name}"
+    else:
+        into_clause = ""
+
+    query = f"""
+    WITH SurveyCTE AS (
+        SELECT 
+            S.Id AS SurveyId,
+            S.StartDateTime,
+            S.EndDateTime,
+            RDS.ReportId
+        FROM
+            Survey S
+            INNER JOIN ReportDrivingSurvey RDS ON S.Id = RDS.SurveyId
+        WHERE 
+            RDS.ReportId IN (SELECT t.ReportId FROM {report_table} t)
+    ),
+    LabelCTE AS (
+        SELECT 
+            RL.ReportId,
+            STRING_AGG(L.Title, ' | ') AS Labels
+        FROM
+            ReportLabel RL
+            INNER JOIN Label L ON RL.LabelId = L.Id
+        WHERE 
+            RL.IsActive = 1 
+            AND RL.ReportId IN (SELECT t.ReportId FROM {report_table} t)
+        GROUP BY RL.ReportId
+    )
+    SELECT 
+        C.Name AS CustomerName,
+        CASE
+            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
+        END AS ReportName,
+        R.Id AS ReportId,
+        R.ReportTitle AS ReportTitle,
+        L.Title AS FinalCheckboxLabel,
+        (SELECT Labels FROM LabelCTE WHERE LabelCTE.ReportId = R.Id) AS Labels,
+        -- Get the earliest and latest survey start time per report from SurveyCTE
+        (SELECT MIN(StartDateTime) FROM SurveyCTE WHERE SurveyCTE.ReportId = R.Id) AS EarliestSurveyStart,
+        (SELECT MIN(EndDateTime) FROM SurveyCTE WHERE SurveyCTE.ReportId = R.Id) AS EarliestSurveyEnd,
+        (SELECT MAX(StartDateTime) FROM SurveyCTE WHERE SurveyCTE.ReportId = R.Id) AS LatestSurveyStart,
+        (SELECT MAX(EndDateTime) FROM SurveyCTE WHERE SurveyCTE.ReportId = R.Id) AS LatestSurveyEnd,
+        R.DateStarted AS ReportDate,
+        RA.ExternalId AS BoundaryName,
+        RA.Shape.STAsText() AS BoundaryGeometry,
+        RAC.AssetLengthKM AS ReportAssetLengthKm,
+        RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
+        RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
+        RAC.DistributionPipeCoveredKm,
+        RAC.DistributionPipeKm,
+        RAC.DistributionPipePercentCovered,
+        RAC.ServicePipeKm,
+        RAC.ServicePipeCoveredKm,
+        (SELECT Description from TimeZone where Id = R.TimeZoneId) AS TimeZone
+    {into_clause}
+    FROM
+        Report R
+    LEFT JOIN Customer C ON
+        R.CustomerId = C.Id
+    LEFT JOIN ReportLabel RL ON
+        R.Id = RL.ReportId
+    LEFT JOIN Label L ON
+        RL.LabelId = L.Id
+    LEFT JOIN ReportType ON
+        R.ReportTypeId = ReportType.Id
+    LEFT JOIN ReportArea RA ON R.Id = RA.ReportId
+    LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
+    LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
+    WHERE
+        {report_id_filter}
+    AND L.Title = 'Final Checkbox'
+        AND RL.IsActive = 1 
+    """
+    return query
+
 @setup_query
 def get_reports(customer_name, table_name = None, years=None, final_checkbox = True):
     year_filter = ""
@@ -95,56 +177,6 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         RAC.ServicePipeCoveredKm,
         RAC.AreaKM2,
         RAC.AreaCoveredKM2
-    """
-    return query
-
-@setup_query
-def get_report_info(report_table, table_name = None):
-    report_id_filter = f"R.Id IN (SELECT ReportId FROM {report_table})"
-    if table_name is not None:
-        into_clause = f"INTO {table_name}"
-    else:
-        into_clause = ""
-
-    query = f"""
-    SELECT 
-        C.Name AS CustomerName,
-        CASE
-            WHEN ReportType.Description = 'Compliance' THEN CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
-            WHEN ReportType.Description = 'Emissions' THEN CONCAT('ER-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
-            ELSE CONCAT('CR-', SUBSTRING(CONVERT(nvarchar(50), R.Id), 1, 6))
-        END AS ReportName,
-        R.Id AS ReportId,
-        R.ReportTitle AS ReportTitle,
-        L.Title AS Label,
-        R.DateStarted AS ReportDate,
-        RA.ExternalId AS BoundaryName,
-        RAC.AssetLengthKM AS ReportAssetLengthKm,
-        RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
-        RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
-        RAC.DistributionPipeCoveredKm,
-        RAC.DistributionPipeKm,
-        RAC.DistributionPipePercentCovered,
-        RAC.ServicePipeKm,
-        RAC.ServicePipeCoveredKm
-    {into_clause}
-    FROM
-        Report R
-    LEFT JOIN Customer C ON
-        R.CustomerId = C.Id
-    LEFT JOIN ReportLabel RL ON
-        R.Id = RL.ReportId
-    LEFT JOIN Label L ON
-        RL.LabelId = L.Id
-    LEFT JOIN ReportType ON
-        R.ReportTypeId = ReportType.Id
-    LEFT JOIN ReportArea RA ON R.Id = RA.ReportId
-    LEFT JOIN ReportCompliance RC ON R.Id = RC.ReportId
-    LEFT JOIN ReportAreaCovered RAC ON R.Id = RAC.ReportId
-    WHERE
-        {report_id_filter}
-    AND L.Title = 'Final Checkbox'
-        AND RL.IsActive = 1 
     """
     return query
 
@@ -349,7 +381,7 @@ def query_reports_view_by_year(customer_name, years = None, table_name = None,li
     return query
 
 
-@setup_query
+
 def reports_view(customer_name, years, is_final_checkbox):
     # Convert the list of years to a string for the SQL IN clause
     years_str = ', '.join(map(str, years))

@@ -33,7 +33,7 @@ class TimezoneAccessor:
         self._obj = pandas_obj
 
 
-    def convert_utc_column_to_local(self, utc_column_name, timezone_column_name, new_column_name):
+    def convert_utc_column_to_local(self, utc_column_name, timezone_column_name = 'TimeZone', new_column_name = None):
         def convert_row_to_local(row):
             utc_datetime = row[utc_column_name]
             # Check if utc_datetime is not already a datetime object
@@ -56,6 +56,11 @@ class TimezoneAccessor:
             local_datetime = utc_localized.astimezone(target_timezone)
             # Format the datetime to include AM or PM
             return local_datetime.strftime('%Y-%m-%d %I:%M:%S %p')
+
+        if new_column_name is None:
+            new_column_name = utc_column_name + '_local'    
+        else:
+            new_column_name = new_column_name
 
         self._obj[new_column_name] = self._obj.apply(convert_row_to_local, axis=1)
         return self._obj
