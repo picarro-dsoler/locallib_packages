@@ -789,9 +789,9 @@ def query_surveys_table(report_table = None, table_name = None):
 
 
 @setup_query
-def query_segments_table(survey_table = None, table_name = None):
+def query_segments_table(survey_table = None, table_name = None, ):
     segments_Columns = Segment.copy()
-    #segments_Columns.delete_column('Shape')
+    segments_Columns.delete_column('Shape')
     segments_Columns.delete_column('Order')
     if table_name is not None:
         into_clause = f"INTO {table_name}"
