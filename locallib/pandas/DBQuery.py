@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import warnings
 import pandas as pd
 from dotenv import load_dotenv
@@ -55,6 +56,8 @@ class DBAccessor:
             temp_name, temp_conn = self.upload_single_column_to_temp_sqlserver(self._obj,Conn=Conn, source_col=source_col, temp_table_name=temp_table_name, sql_col_name=sql_col_name, varchar_len=varchar_len, chunksize=chunksize, erase_table=erase_table)
         elif Conn.dbtype == 'postgresql':
             temp_name, temp_conn = self.upload_single_column_to_temp_postgresql(self._obj,Conn=Conn, source_col=source_col, temp_table_name=temp_table_name, sql_col_name=sql_col_name, varchar_len=varchar_len, chunksize=chunksize, erase_table=erase_table)
+        elif Conn.dbtype == 'sqlite':
+            temp_name, temp_conn = self.upload_single_column_to_temp_sqlite(self._obj,Conn=Conn, source_col=source_col, temp_table_name=temp_table_name, sql_col_name=sql_col_name, varchar_len=varchar_len, chunksize=chunksize, erase_table=erase_table)
         else:
             raise ValueError(f"Unsupported database type: {Conn.dbtype}")
         
@@ -195,6 +198,110 @@ class DBAccessor:
         finally:
             # Intentionally do NOT close conn; caller should close when done with #temp.
             pass
+
+        return temp_table_name, conn
+
+    def upload_single_column_to_temp_sqlite(self,
+        df: pd.DataFrame,
+        Conn,
+        source_col: str,
+        temp_table_name: str = "tmp_single_col",
+        sql_col_name: str = None,
+        varchar_len: int = 4000,
+        chunksize: int = 10000,
+        erase_table: bool = True
+    ) -> Tuple[str, object]:
+        """
+        Create a one-column TEMP table in SQLite and upload that column from df.
+
+        Returns
+        -------
+        (temp_table_name, dbapi_conn)
+        - temp table name (str)
+        - the open sqlite3 connection that owns the temp session
+        """
+        if source_col not in df.columns:
+            raise KeyError(f"Column '{source_col}' not found in DataFrame.")
+
+        temp_table_name = temp_table_name.lstrip("#")
+        if not temp_table_name.startswith("temp_"):
+            temp_table_name = f"temp_{temp_table_name}"
+
+        if sql_col_name is None:
+            sql_col_name = source_col
+
+        s = df[source_col]
+
+        def looks_like_uuid_series(series: pd.Series) -> bool:
+            sample = series.dropna().head(50)
+            if sample.empty:
+                return False
+
+            def is_uuid_like(v):
+                if isinstance(v, uuid.UUID):
+                    return True
+                if isinstance(v, str):
+                    try:
+                        uuid.UUID(v.strip())
+                        return True
+                    except Exception:
+                        return False
+                return False
+
+            valid = sum(is_uuid_like(v) for v in sample)
+            return valid >= max(3, int(0.8 * len(sample)))
+
+        dtype = str(s.dtype)
+        if looks_like_uuid_series(s):
+            sql_type = "TEXT"
+        elif dtype.startswith("int") or dtype == "bool":
+            sql_type = "INTEGER"
+        elif dtype.startswith("float") or np.issubdtype(s.dtype, np.floating):
+            sql_type = "REAL"
+        elif "datetime64" in dtype:
+            sql_type = "TEXT"
+        else:
+            sql_type = "TEXT"
+
+        create_sql = f"CREATE TEMP TABLE {temp_table_name} ({sql_col_name} {sql_type});"
+        insert_sql = f"INSERT INTO {temp_table_name} ({sql_col_name}) VALUES (?);"
+
+        def coerce(v):
+            if pd.isna(v):
+                return None
+            if isinstance(v, uuid.UUID):
+                return str(v)
+            if isinstance(v, pd.Timestamp):
+                return v.isoformat()
+            if isinstance(v, pd.Timedelta):
+                return str(v)
+            if isinstance(v, np.integer):
+                return int(v)
+            if isinstance(v, np.floating):
+                return float(v)
+            if isinstance(v, np.bool_):
+                return int(v)
+            return v
+
+        rows = [(coerce(v),) for v in s.tolist()]
+
+        db_path = Conn.host
+        conn = sqlite3.connect(db_path)
+        try:
+            cur = conn.cursor()
+            if erase_table:
+                cur.execute(f"DROP TABLE IF EXISTS {temp_table_name};")
+            cur.execute(create_sql)
+            if chunksize and len(rows) > chunksize:
+                for i in range(0, len(rows), chunksize):
+                    cur.executemany(insert_sql, rows[i:i + chunksize])
+            else:
+                cur.executemany(insert_sql, rows)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            conn.close()
+            raise
 
         return temp_table_name, conn
 
