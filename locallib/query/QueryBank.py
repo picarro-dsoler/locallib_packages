@@ -58,7 +58,7 @@ def get_report_info(report_table, table_name = None):
         (SELECT MAX(EndDateTime) FROM SurveyCTE WHERE SurveyCTE.ReportId = R.Id) AS LatestSurveyEnd,
         R.DateStarted AS ReportDate,
         RA.ExternalId AS BoundaryName,
-        RA.Shape.STAsText() AS BoundaryGeometry,
+        RA.Shape.STAsText() AS ReportArea,
         RAC.AssetLengthKM AS ReportAssetLengthKm,
         RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
         RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
@@ -119,6 +119,7 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         R.DateStarted AS ReportDate,
         RA.ExternalId AS BoundaryName,
         RA.BoundaryType AS BoundaryType,
+        RA.Shape.STAsText() AS ReportArea,
         RAC.AssetLengthKM AS ReportAssetLengthKm,
         RC.PercentCoverageAssets AS ReportPercentCoverageAssets,
         RAC.AssetLengthKM * RC.PercentCoverageAssets AS AssetCoveredLengthKm,
@@ -166,6 +167,7 @@ def get_reports(customer_name, table_name = None, years=None, final_checkbox = T
         RA.ExternalId,
         RA.BoundaryType,
         RAC.AssetLengthKM,
+        RA.Shape.STAsText(),
         ReportType.Description,
         RAC.AssetLengthKM,
         RAC.AreaCoveredKM2,
@@ -294,6 +296,7 @@ def query_reports_view(report_table,table_name = None):
     rp_id  as "ReportId",
     rp_percentcoverageassets as "ReportPercentCoverageAssets_DH",
     lisa_count as "LisaCount",
+    rp_title as "ReportTitle",
     rp_name as "ReportName",
     rp_date as "ReportDate",
     rp_label_final as "ReportLabelFinal",
@@ -305,6 +308,7 @@ def query_reports_view(report_table,table_name = None):
     bo_subplant as "BoundarySubplant",
     bo_region as "BoundaryRegion",
     bo_subregion as "BoundarySubRegion",
+    bo_subsubregion as "BoundarySubSubRegion",
     bo_km_network as "BoundaryKmNetwork",
     EXTRACT(YEAR FROM rp_date) as "Year",
     EXTRACT(MONTH FROM rp_date) as "Month"
@@ -419,7 +423,7 @@ def reports_view(customer_name, years, is_final_checkbox):
     return query
 
 @setup_query
-def survey_query(report_table=None,table_name = None):
+def survey_query(report_table=None, table_name=None):
     if table_name is not None:
         into_clause = f"INTO {table_name}"
     else:
@@ -457,11 +461,12 @@ def survey_query(report_table=None,table_name = None):
         (SELECT SUM(DurationSeconds) / 60.0
         FROM Segment
         WHERE SurveyId = S.Id AND Mode = 0) AS DurationMinutes,
-    DATEDIFF(MINUTE, S.StartDateTime, S.EndDateTime) AS RawDurationMinutes,
+        DATEDIFF(MINUTE, S.StartDateTime, S.EndDateTime) AS RawDurationMinutes,
         S.StartEpoch,
         S.EndEpoch,
         L.Description AS Zone ,
         TZ.Description AS TimeZone
+    {into_clause}
     FROM Customer C
         INNER JOIN [User] U ON C.Id = U.CustomerId
         INNER JOIN Survey S ON U.Id = S.UserId
@@ -474,7 +479,6 @@ def survey_query(report_table=None,table_name = None):
         LEFT JOIN SurveyorUnit SU on S.SurveyorUnitId = SU.Id
         LEFT JOIN SurveyModeType SMT on S.SurveyModeTypeId = SMT.Id
     WHERE R.Id  IN (SELECT ReportId FROM {report_table})
-    {into_clause}
     """
     return query
 
@@ -795,6 +799,7 @@ def query_surveys_table(report_table = None, table_name = None):
     SQC.LateralRotation as LateralRotation,
     SQC.NumberOfPeaks as NumberOfPeaks,
     (SELECT Description FROM SurveyorUnit SU WHERE SU.Id = S.SurveyorUnitId) AS SurveyorUnit, 
+    (SELECT SerialNumber FROM Analyzer A WHERE A.Id = S.AnalyzerId) AS AnalyzerSerialNumber,
     RDS.ReportId AS ReportId 
     {into_clause} FROM Survey S 
     LEFT JOIN ReportDrivingSurvey RDS ON S.Id = RDS.SurveyId
