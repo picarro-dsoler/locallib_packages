@@ -716,11 +716,20 @@ def emission_sources_table_query_given_report_id(report_table=None,table_name = 
     return query
 
 @setup_query
-def query_box_table(report_table = None, table_name = None):
+def query_box_table(report_table = None, table_name = None, indication_type = 'L'):
     if table_name is not None:
         into_clause = f"INTO {table_name}"
     else:
         into_clause = ""
+    if indication_type is not None:
+        if indication_type == 'L':
+            indication_type_clause = f"AND B.UniqueIdentifier LIKE '%L%'"
+        elif indication_type == 'G':
+            indication_type_clause = f"AND B.UniqueIdentifier LIKE '%G%'"
+        else:
+            indication_type_clause = ""
+    else:
+        indication_type_clause = ""
     query = f"""SELECT B.Id as BoxId,
                 B.BoxShape.STAsText() as BoxShape,
                 B.EmissionSourceId as EmissionSourceId,
@@ -731,8 +740,8 @@ def query_box_table(report_table = None, table_name = None):
                 FROM Box B 
                 
                 WHERE B.ReportId IN (SELECT ReportId FROM {report_table}) AND
-                B.UniqueIdentifier NOT LIKE '%G-0'AND
-                B.UniqueIdentifier LIKE '%L%'
+                B.UniqueIdentifier NOT LIKE '%G-0'
+                {indication_type_clause}
                 """
     return query
 
