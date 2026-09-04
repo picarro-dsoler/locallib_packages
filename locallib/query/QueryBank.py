@@ -90,9 +90,20 @@ def get_report_info(report_table, table_name = None):
     return query
 
 @setup_query
-def get_reports(customer_name, table_name = None, years=None, final_checkbox = True):
+def get_reports(customer_name, table_name = None, years=None, start_date = None, end_date = None, final_checkbox = True):
     year_filter = ""
-    if years:
+    start_date_filter = ""
+    end_date_filter = ""
+
+    # Make year filter mutually exclusive with start/end date; prioritize date range if specified
+    if start_date or end_date:
+        if start_date:
+            start_date_filter = f"AND R.DateStarted >= '{start_date}'"
+        if end_date:
+            end_date_filter = f"AND R.DateStarted <= '{end_date}'"
+        # If date range is specified, ignore years
+        year_filter = ""
+    elif years:
         years_str = ", ".join(str(year) for year in years)
         year_filter = f"AND YEAR(R.DateStarted) IN ({years_str})"
 
